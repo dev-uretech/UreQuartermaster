@@ -10,7 +10,7 @@ import { park } from '../skills/urequartermaster/scripts/lib/library/park.mjs';
 import { unpark } from '../skills/urequartermaster/scripts/lib/library/unpark.mjs';
 import { parkPlugin } from '../skills/urequartermaster/scripts/lib/library/plugin.mjs';
 import { deriveName, validateSource } from '../skills/urequartermaster/scripts/lib/library/names.mjs';
-import { dirLinkArgs } from '../skills/urequartermaster/scripts/lib/library/move.mjs';
+import { dirLinkArgs, dirLinkAttempts } from '../skills/urequartermaster/scripts/lib/library/move.mjs';
 import { envGet, findExe } from '../skills/urequartermaster/scripts/lib/core/which.mjs';
 import { loadState } from '../skills/urequartermaster/scripts/lib/core/config.mjs';
 
@@ -762,6 +762,15 @@ test('unpark recreates folder links as junctions on Windows (no Developer Mode n
   assert.deepEqual(dirLinkArgs('..\\..\\.agents\\skills\\foo', 'C:\\Users\\a\\.claude\\skills\\foo', 'win32'),
     ['C:\\Users\\a\\.agents\\skills\\foo', 'C:\\Users\\a\\.claude\\skills\\foo', 'junction']);
   assert.deepEqual(dirLinkArgs('D:\\skills\\foo', 'C:\\x\\foo', 'win32'), ['D:\\skills\\foo', 'C:\\x\\foo', 'junction']);
+});
+
+test('on Windows a relative link is recreated as the same symlink first, a junction only as fallback', () => {
+  const rel = '..\\..\\.agents\\skills\\foo';
+  const link = 'C:\\Users\\a\\.claude\\skills\\foo';
+  assert.deepEqual(dirLinkAttempts(rel, link, 'win32'), [[rel, link, 'dir'], ['C:\\Users\\a\\.agents\\skills\\foo', link, 'junction']]);
+  // A junction reads back absolute: it is recreated as a junction, never tried as a symlink.
+  assert.deepEqual(dirLinkAttempts('C:\\Users\\a\\.agents\\skills\\foo\\', link, 'win32'), [['C:\\Users\\a\\.agents\\skills\\foo', link, 'junction']]);
+  assert.deepEqual(dirLinkAttempts('../../x', '/h/.claude/skills/x', 'linux'), [['../../x', '/h/.claude/skills/x', 'dir']]);
 });
 
 test('Windows env lookup: with both "Path" and "PATH" the one child_process passes on wins', () => {

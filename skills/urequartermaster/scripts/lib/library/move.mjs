@@ -60,3 +60,15 @@ export function dirLinkArgs(target, linkPath, platform) {
   if (platform !== 'win32') return [target, linkPath, 'dir'];
   return [path.win32.resolve(path.win32.dirname(linkPath), target), linkPath, 'junction'];
 }
+
+/**
+ * The fs.symlinkSync calls to try, in order, to recreate a folder link as it was. On Windows a
+ * relative target can only come from a real symbolic link (a junction always stores an absolute
+ * path), so it is recreated as that same link first; without Developer Mode or admin rights that
+ * fails and a junction to the same folder takes its place.
+ */
+export function dirLinkAttempts(target, linkPath, platform) {
+  const fallback = dirLinkArgs(target, linkPath, platform);
+  if (platform !== 'win32' || path.win32.isAbsolute(target)) return [fallback];
+  return [[target, linkPath, 'dir'], fallback];
+}

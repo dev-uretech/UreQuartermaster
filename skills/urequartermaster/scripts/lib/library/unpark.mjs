@@ -8,7 +8,7 @@ import { resolveOptions as resolve } from '../core/options.mjs';
 import { safe, exists, real, isPlainDir } from '../core/files.mjs';
 import { loadConfig, loadState, saveState } from '../core/config.mjs';
 import { safeFolderName } from './names.mjs';
-import { isSubset, moveDir, dirLinkArgs } from './move.mjs';
+import { isSubset, moveDir, dirLinkAttempts } from './move.mjs';
 import { readLock, writeLock } from './skills-lock.mjs';
 import { parkedPath, rebuild } from './store.mjs';
 import { userSkillDirs, bothKept } from './park.mjs';
@@ -56,7 +56,9 @@ export function unpark(skillName, opts = {}) {
   const links = (Array.isArray(rec.links) ? rec.links : []).filter((l) => l && typeof l.path === 'string' && typeof l.target === 'string'
     && skillDirs.some((d) => path.dirname(path.resolve(l.path)) === path.resolve(d)));
   const mode = rec.interrupted || (rec.pending ? 'park' : null);
-  const sameLink = (l) => safe(() => fs.lstatSync(l.path).isSymbolicLink() && fs.readlinkSync(l.path) === l.target, false);
+  // Same folder, however it is spelled: a junction made in place of a relative symlink reads back absolute.
+  const pointsTo = (l, t) => path.resolve(path.dirname(l.path), t);
+  const sameLink = (l) => safe(() => fs.lstatSync(l.path).isSymbolicLink() && pointsTo(l, fs.readlinkSync(l.path)) === pointsTo(l, l.target), false);
   const done = () => { state.parked = state.parked.filter((p) => p !== rec); saveState(r.dataDir, state); };
   const finish = () => {
     const warnings = [];
@@ -64,7 +66,10 @@ export function unpark(skillName, opts = {}) {
       if (exists(l.path)) continue;
       try {
         fs.mkdirSync(path.dirname(l.path), { recursive: true });
-        fs.symlinkSync(...dirLinkArgs(l.target, l.path, r.platform));
+        const attempts = dirLinkAttempts(l.target, l.path, r.platform);
+        for (let i = 0; i < attempts.length; i++) {
+          try { fs.symlinkSync(...attempts[i]); break; } catch (e) { if (i === attempts.length - 1) throw e; }
+        }
       } catch (e) { warnings.push(`could not recreate link ${l.path}: ${e.code || e.message}`); }
     }
     if (rec.lockEntry !== undefined && rec.lockKey) {
