@@ -11,6 +11,7 @@ import { unpark } from '../skills/urequartermaster/scripts/lib/library/unpark.mj
 import { parkPlugin } from '../skills/urequartermaster/scripts/lib/library/plugin.mjs';
 import { deriveName, validateSource } from '../skills/urequartermaster/scripts/lib/library/names.mjs';
 import { dirLinkArgs } from '../skills/urequartermaster/scripts/lib/library/move.mjs';
+import { envGet, findExe } from '../skills/urequartermaster/scripts/lib/core/which.mjs';
 import { loadState } from '../skills/urequartermaster/scripts/lib/core/config.mjs';
 
 const QM = fileURLToPath(new URL('../skills/urequartermaster/scripts/qm.mjs', import.meta.url));
@@ -761,4 +762,19 @@ test('unpark recreates folder links as junctions on Windows (no Developer Mode n
   assert.deepEqual(dirLinkArgs('..\\..\\.agents\\skills\\foo', 'C:\\Users\\a\\.claude\\skills\\foo', 'win32'),
     ['C:\\Users\\a\\.agents\\skills\\foo', 'C:\\Users\\a\\.claude\\skills\\foo', 'junction']);
   assert.deepEqual(dirLinkArgs('D:\\skills\\foo', 'C:\\x\\foo', 'win32'), ['D:\\skills\\foo', 'C:\\x\\foo', 'junction']);
+});
+
+test('Windows env lookup: with both "Path" and "PATH" the one child_process passes on wins', () => {
+  // child_process on Windows keeps the first of case-insensitive duplicate keys in sorted order.
+  assert.equal(envGet({ Path: 'C:\\real', PATH: 'C:\\nobin' }, 'PATH', true), 'C:\\nobin');
+  assert.equal(envGet({ PATH: 'C:\\nobin', Path: 'C:\\real' }, 'PATH', true), 'C:\\nobin');
+  assert.equal(envGet({ Path: 'C:\\real' }, 'PATH', true), 'C:\\real');
+  assert.equal(envGet({ Path: 'x' }, 'PATH', false), undefined);
+  // The same rule end to end: an inherited Path holding git must not be searched when PATH overrides it.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'qm-which-'));
+  const real = path.join(root, 'real'); const none = path.join(root, 'nobin');
+  write(path.join(real, 'git.exe'), '');
+  fs.mkdirSync(none);
+  assert.equal(findExe('git', { Path: real }, 'win32'), path.join(real, 'git.exe'));
+  assert.equal(findExe('git', { Path: real, PATH: none }, 'win32'), null);
 });

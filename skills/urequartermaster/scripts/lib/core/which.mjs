@@ -9,10 +9,15 @@ const WINDOWS_SKIP = new Set(['convert']);
 /** A command name that is safe to look up: no path separators, no option-like first character. */
 export const SAFE_COMMAND_NAME = /^[A-Za-z0-9][A-Za-z0-9._+-]*$/;
 
-function envGet(env, name, win) {
+/**
+ * Reads an environment variable. Windows names are case-insensitive, and an env object built as
+ * { ...process.env, PATH: x } holds both "Path" and "PATH": child_process keeps the first of such
+ * keys in sorted order, so this does the same and the PATH searched is the PATH the program gets.
+ */
+export function envGet(env, name, win) {
   if (!env || typeof env !== 'object') return undefined;
   if (!win) return env[name];
-  const k = Object.keys(env).find((x) => x.toUpperCase() === name);
+  const k = Object.keys(env).filter((x) => x.toUpperCase() === name).sort()[0];
   return k === undefined ? undefined : env[k];
 }
 
