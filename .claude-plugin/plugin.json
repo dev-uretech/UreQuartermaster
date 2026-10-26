@@ -1,7 +1,7 @@
 {
   "name": "urequartermaster",
   "description": "You're set: every skill, MCP server, plugin and CLI you already have, found and used for you. Indexes your local tools so the agent searches them before each non-trivial request.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "UreTech"
   },

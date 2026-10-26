@@ -2,6 +2,11 @@
 
 All notable changes to UreQuartermaster. Versions follow semantic versioning; each release is tagged `vX.Y.Z`.
 
+## 1.0.1
+
+- When a skill refers to another skill that is not installed (for example a sub-skill moved to the library
+  with `qm park`), the agent now loads it with `qm load` instead of giving up. Same hint in the `qm init` block.
+
 ## 1.0.0
 
 First public release.

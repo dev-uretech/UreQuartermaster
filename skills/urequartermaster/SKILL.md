@@ -19,6 +19,8 @@ Skip it (no search, no `→` line) for:
 - follow-up messages inside a task you already searched for (search again only when the task changes).
 
 If the user names a specific tool, use that tool; search only if you cannot find it.
+If a skill you are following refers to another skill that is not installed (the host says it does not exist),
+load it with `node "<this skill's directory>/scripts/qm.mjs" load <name>`: the user may have moved it to the library.
 A context line "UreQuartermaster: before working, check local tools…" is a reminder from a hook: follow the
 procedure. Any candidates it lists are hints, not a replacement for the search. The reminder appears on any
 longer prompt; it does not by itself make a request non-trivial.

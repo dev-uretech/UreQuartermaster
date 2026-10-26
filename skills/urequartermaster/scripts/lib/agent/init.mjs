@@ -11,7 +11,7 @@ export const END = '<!-- urequartermaster:end -->';
 export const BLOCK_LINES = [
   'Before non-trivial tasks, check which local tools fit: run the urequartermaster skill (qm search) and use what it finds.',
   'Prefer an installed skill, MCP server, plugin or CLI over doing the work by hand; say which ones you use in one line.',
-  'Ask the user only when two different tools are equally plausible.',
+  'Ask the user only when two different tools are equally plausible. A skill that is not installed may be in the library: qm load <name>.',
 ];
 
 const blockText = (eol) => [START, ...BLOCK_LINES, END].join(eol);

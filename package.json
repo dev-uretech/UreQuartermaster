@@ -1,6 +1,6 @@
 {
   "name": "urequartermaster",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Indexes local skills, MCP servers, plugins and CLIs so coding agents find and use them.",
   "type": "module",
   "license": "MIT",

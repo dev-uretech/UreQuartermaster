@@ -132,3 +132,8 @@ test('public texts carry no AI signature', () => {
     assert.doesNotMatch(t, /Co-Authored-By|Generated with|written by (Claude|an AI)/i, path.basename(f));
   }
 });
+
+test('SKILL.md: a skill referred to by another skill but parked is loaded from the library', () => {
+  const body = fs.readFileSync(SKILL, 'utf8');
+  assert.match(body, /refers to another skill that is not installed[\s\S]{0,200}qm\.mjs" load <name>/);
+});
