@@ -6,7 +6,7 @@ import path from 'node:path';
 import { safe, lstat } from '../core/files.mjs';
 import { buildIndex, saveIndex } from '../index/index.mjs';
 
-const PARKED = '_parked';
+export const PARKED = '_parked';
 
 export function rebuild(r) {
   const idx = buildIndex(r);

@@ -1,17 +1,52 @@
 // qm doctor: read-only diagnosis. Returns {level, message}[]; never changes anything.
 import { loadIndex, isStale } from '../index/index.mjs';
 import { loadConfig, loadState } from '../core/config.mjs';
-import { dataDir, agentLocations } from '../core/paths.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
+import { dataDir, agentLocations, skillReaders } from '../core/paths.mjs';
 import { listClaudePlugins } from '../scan/claude-plugins.mjs';
+import { scanSkills } from '../scan/skills.mjs';
+import { real, safe } from '../core/files.mjs';
 import { clean } from '../core/text.mjs';
 
-const MAX_SKILLS = 60;
+// Claude Code's skill listing (code.claude.com/docs/en/skills): every name is listed; past a budget of 1% of the
+// context window (8,000 characters when unknown) the descriptions of the least-used skills are dropped, and each
+// description is capped at 1,536 characters. There is no documented limit on the number of skills.
+const LISTING_BUDGET = 8000;
+const LISTING_MAX_DESC = 1536;
+const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+/** Estimated size of Claude Code's skill listing: name plus description (capped) per skill. */
+export function listingSize(skills) {
+  return skills.reduce((n, e) => n + String(e.name ?? '').length + Math.min(String(e.description ?? '').length, LISTING_MAX_DESC), 0);
+}
+
+const isOwn = (e) => String(e.name).toLowerCase().split(':').pop() === 'urequartermaster';
+
+// Skills one agent loads: its folders (links resolved, the same file once) and, for Claude Code, enabled plugins.
+function agentSkills(reader, loc, cwd) {
+  const plugins = reader.plugins
+    ? { installedPluginsFile: loc.installedPluginsFile, pluginCache: loc.pluginCache, claudeSettingsFile: loc.claudeSettingsFile }
+    : { installedPluginsFile: null, pluginCache: null, claudeSettingsFile: null };
+  return scanSkills({ skillDirs: reader.dirs, ...plugins }, { cwd }).filter((e) => e.state === 'installed');
+}
+
+// Distinct copies of UreQuartermaster an agent would load, by real folder.
+function ownCopies(skills) {
+  const seen = new Map();
+  for (const e of skills.filter(isOwn)) {
+    const dir = path.dirname(e.path);
+    const key = real(dir) || dir;
+    if (!seen.has(key)) seen.set(key, dir);
+  }
+  return [...seen.values()];
+}
 const list = (items, max = 5) => {
   const shown = items.slice(0, max).map(clean).join(', ');
   return items.length > max ? `${shown} and ${items.length - max} more` : shown;
 };
 
-/** @returns {{ level: 'ok'|'warn'|'error', message: string }[]} */
+/** @returns {{ level: 'ok'|'info'|'warn'|'error', message: string }[]} */
 export function doctor(opts = {}) {
   const out = [];
   const add = (level, message) => out.push({ level, message });
@@ -39,21 +74,35 @@ export function doctor(opts = {}) {
   else add('ok', 'Prompt hook not active: it comes with the Claude Code plugin, which is not installed or not enabled.');
 
   if (idx) {
-    const entries = idx.entries;
-    const dups = entries.filter((e) => e.duplicateOf);
+    const dups = idx.entries.filter((e) => e.duplicateOf);
     if (dups.length) add('warn', `${dups.length} duplicate entr${dups.length === 1 ? 'y' : 'ies'} shadowed by another with the same name: ${list(dups.map((e) => e.name))}.`);
     else add('ok', 'No duplicates');
-
-    const skills = entries.filter((e) => e.kind === 'skill' && e.state === 'installed' && !e.duplicateOf);
-    if (skills.length > MAX_SKILLS) add('warn', `${skills.length} skills are installed (more than ${MAX_SKILLS}): the host may truncate descriptions; consider \`qm park\`.`);
-    else add('ok', `${skills.length} installed skills`);
-
-    const own = entries.filter((e) => e.kind === 'skill' && String(e.name).toLowerCase().split(':').pop() === 'urequartermaster' && e.path);
-    if (own.length > 1) {
-      const dirs = [...new Set(own.map((e) => String(e.path).replace(/[\\/]SKILL\.md$/i, '')))];
-      if (dirs.length > 1) add('warn', `Several copies of UreQuartermaster are installed: ${dirs.map(clean).join('; ')}. Keep one.`);
-    }
   }
+
+  // What each agent in use (its own folder exists) actually loads.
+  let readers;
+  try {
+    const where = { home: opts.home, env, cwd: opts.cwd, platform: opts.platform };
+    const loc = agentLocations(where);
+    const cwd = opts.cwd || process.cwd();
+    readers = skillReaders(where).map((r) => ({ ...r, used: safe(() => fs.statSync(r.home).isDirectory(), false), skills: agentSkills(r, loc, cwd) }));
+  } catch { readers = []; }
+
+  const claude = readers.find((r) => r.agent === 'claude');
+  if (claude) {
+    const listed = claude.skills.filter((e) => !e.duplicateOf);
+    const size = listingSize(listed);
+    const what = `~${fmt(size)} characters for ${listed.length} skill${listed.length === 1 ? '' : 's'}`;
+    if (size > LISTING_BUDGET) add('warn', `Claude Code skill listing: ${what}. It may exceed Claude Code's skill listing budget (1% of the context window; 8,000 characters when unknown): descriptions of the least-used skills are dropped. Check /context, or park skills you rarely use with qm park.`);
+    else add('info', `Claude Code skill listing: ${what}`);
+  }
+
+  // Several copies are a problem only when the same agent loads them: one per agent is the intended setup.
+  const users = readers.filter((r) => r.used).map((r) => ({ label: r.label, copies: ownCopies(r.skills) }));
+  const crowded = users.filter((u) => u.copies.length > 1);
+  for (const u of crowded) add('warn', `${u.label} would load ${u.copies.length} copies of UreQuartermaster: ${u.copies.map(clean).join('; ')}. Keep one.`);
+  const single = users.filter((u) => u.copies.length === 1);
+  if (!crowded.length && single.length) add('ok', `One UreQuartermaster copy per agent: ${single.map((u) => `${u.label} uses ${clean(u.copies[0])}`).join('; ')}`);
 
   for (const r of loadState(dir).parked) {
     if (!r.pending && !r.interrupted) continue;

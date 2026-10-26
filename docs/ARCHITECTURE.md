@@ -41,9 +41,9 @@ never do.
 | `cli.mjs` | Usage text, the command table and `dispatch` (with the background update tick) |
 | `commands/common.mjs` | Argument parsing, `UsageError`, third-party notices, error cleaning |
 | `commands/search.mjs`, `load.mjs`, `list.mjs` | `qm search`, `qm load`, `qm list` and `qm index` |
-| `commands/library.mjs` | `qm add`, `sync`, `park`, `unpark` |
+| `commands/library.mjs` | `qm add`, `sync`, `remove`, `park`, `unpark` |
 | `commands/init.mjs`, `doctor.mjs`, `update.mjs` | `qm init`, `qm doctor`, `qm update` and `qm rollback` |
-| `core/paths.mjs` | Data folder and every agent's file locations, per platform |
+| `core/paths.mjs` | Data folder and every agent's file locations, per platform; which skill folders each agent reads |
 | `core/config.mjs` | `config.json` and `state.json`: tolerant load, atomic save |
 | `core/text.mjs` | `clean()` / `cleanBody()`: strip control characters from third-party text |
 | `core/files.mjs` | Never-throwing file reads, `readJsonObject`, atomic `writeFileAtomic` |
@@ -67,7 +67,7 @@ never do.
 | `index/fingerprint.mjs` | What the index was built from: folder mtimes plus the MCP servers by content |
 | `index/project.mjs` | Live scan of the current project's skills and approved MCP servers |
 | `index/search.mjs` | Tokenizer and multi-query BM25 |
-| `library/collections.mjs` | `qm add` and `qm sync`: git collections in the library |
+| `library/collections.mjs` | `qm add`, `qm sync` and `qm remove`: git collections in the library |
 | `library/park.mjs` | `qm park`: move an installed skill into `library/_parked/`, with a record first |
 | `library/unpark.mjs` | `qm unpark` and `--forget`: restore, resume an interrupted move, or drop the record |
 | `library/plugin.mjs` | `qm park --plugin`: build or run `claude plugin disable` |
@@ -85,7 +85,7 @@ never do.
 | `update/lock.mjs` | The exclusive update lock, with race-free takeover of a stale one |
 | `agent/init.mjs` | The marked block in the agents' instruction files |
 | `agent/hook.mjs` | The `UserPromptSubmit` hook |
-| `agent/doctor.mjs` | Read-only diagnosis |
+| `agent/doctor.mjs` | Read-only diagnosis: index, hook, duplicates, Claude Code listing size, copies per agent |
 
 ## Data flow
 
@@ -112,9 +112,20 @@ rebuild, no project scan, no network, no update check), adds a one-line reminder
 five strong candidates, and skips the candidates if loading took more than 150 ms. Any error yields empty output.
 
 **Library.** `qm add` validates the source, clones it with git into `library/<name>`, then rebuilds the index.
-`qm sync` fetches and resets each git collection. `qm park` moves an installed skill into `library/_parked/` and
-records where it came from, its links and its skills CLI lock entry; `qm unpark` reverses it, and both resume
-safely after a crash. `qm park --plugin` builds (and, with `--yes`, runs) `claude plugin disable`.
+`qm sync` fetches and resets each git collection. `qm remove` deletes one (never `_parked`, a link or a folder
+that is not a git clone): it renames it to a `.tmp-` folder, deletes that, and rebuilds the index. `qm park`
+moves an installed skill into `library/_parked/` and records where it came from, its links and its skills CLI lock
+entry; `qm unpark` reverses it, and both resume safely after a crash. `qm park --plugin` builds (and, with
+`--yes`, runs) `claude plugin disable`.
+
+**Doctor.** `skillReaders()` in `core/paths.mjs` says which skill folders each agent reads: Claude Code its own
+folder, the project's `.claude/skills` and its enabled plugins (not `~/.agents/skills`, which the skills CLI links
+into `~/.claude/skills` when Claude Code is a target); Codex `~/.agents/skills`, `CODEX_HOME/skills` and the
+project's `.agents/skills`; Gemini CLI `~/.gemini/skills`; OpenCode its own folder plus the Claude and `.agents`
+ones. `qm doctor` scans them per agent (links resolved, so a linked copy counts once) and warns about several
+copies of UreQuartermaster only when one agent in use (its own folder exists) would load more than one. For Claude
+Code it also estimates the skill listing (name plus description, capped at 1,536 characters, per skill) and warns
+above 8,000 characters, the budget Claude Code uses when the context window is unknown.
 
 **Update and signing.** Commands that use the index (`search`, `load`, `list`, `index`, never the hook) call
 `autoUpdateTick`: it prints a stored update message once and, at most once a day, starts `qm update --background`
@@ -132,7 +143,7 @@ Data folder: `UREQM_HOME` when it is an absolute path, else `~/.urequartermaster
 | `index.json` | `{ version: 2, builtAt, fingerprint, entries[] }`. Each entry: `id` (`<kind>:<name>`, `@<source>` and `#n` suffixes for duplicates), `kind` (`skill`, `mcp`, `plugin`, `cli`), `name`, `description`, `headings`, `path`, `source`, `state` (`installed`, `library`, `plugin-disabled`, `available`), `usage`, optional `duplicateOf` and `trustRoot`. Another `version` is ignored and rebuilt. |
 | `config.json` | User settings: `extraSkillDirs`, `clis`, `autoUpdate`, `hook`, `maxIndexAgeHours`, `mcpDescriptions`, `trustProjectMcp`. Missing, corrupt or wrong-typed fields fall back to defaults. |
 | `state.json` | Bookkeeping: `lastUpdateCheck`, `installedVersion`, `lastUpdateMessage`, `parked[]` (`name`, `from`, `to`, `links`, `lockKey`/`lockIndex`/`lockEntry`, and `pending` or `interrupted` while a move is unfinished). |
-| `library/<collection>/` | A git collection added with `qm add`. `.tmp-*` folders are interrupted clones, removed after an hour. |
+| `library/<collection>/` | A git collection added with `qm add`. `.tmp-*` folders are interrupted clones or removals, removed after an hour. |
 | `library/_parked/<skill>/` | A parked skill. |
 | `backup/<version>-<timestamp>[-n]/` | Previous versions kept by updates and rollbacks (three at most). |
 | `update.lock` | Exclusive lock of an update or rollback (`wx` create; taken over when older than 10 minutes). |

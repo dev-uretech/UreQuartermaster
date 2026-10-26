@@ -95,7 +95,7 @@ helps: `alias qm='node "$HOME/.agents/skills/urequartermaster/scripts/qm.mjs"'`.
 
 ```bash
 qm init                                   # tell every agent, in its global instructions file, to search first
-qm doctor                                 # duplicates, list budget, Node, hook: what to fix
+qm doctor                                 # duplicates, listing size, copies, Node, hook: what to fix
 qm add https://github.com/google/skills   # put a large collection in the library, searchable but off the list
 qm park <skill>                           # move a rarely used installed skill into the library
 ```
@@ -118,11 +118,12 @@ the host: whole collections added with `qm add`, and skills you park. Library sk
 | `qm index [--json]` | Rebuild the index now |
 | `qm add <url> [--name <collection>]` | Clone a git collection of skills into the library (any git host) |
 | `qm sync` | Pull every library collection and rebuild the index |
+| `qm remove <collection>` | Delete a collection added with `qm add` from the library and rebuild the index |
 | `qm park <skill>` | Move an installed skill from a user folder into the library |
 | `qm park --plugin <plugin> [--yes]` | Disable a Claude Code plugin; its skills stay searchable and loadable |
 | `qm unpark <skill> [--forget]` | Put a parked skill back; `--forget` drops the record of a park that cannot be undone |
 | `qm init [--remove] [--dry-run] [--agent claude\|codex\|gemini\|copilot\|opencode]` | Add or remove the "search first" block in the agents' instruction files |
-| `qm doctor` | Check duplicates, the host's skill list budget, Node, the hook and the installation |
+| `qm doctor` | Check duplicates, the estimated size of Claude Code's skill listing, one UreQuartermaster copy per agent, Node and the hook |
 | `qm update [--check]` | Check for and install a signed release now |
 | `qm rollback` | Go back to the version before the last update |
 | `qm hook` | Used by the Claude Code hook (reads the prompt as JSON on stdin) |

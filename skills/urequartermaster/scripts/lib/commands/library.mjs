@@ -1,9 +1,9 @@
-// `qm add`, `qm sync`, `qm park` (skills and --plugin) and `qm unpark`. Their errors can carry git
+// `qm add`, `qm sync`, `qm remove`, `qm park` (skills and --plugin) and `qm unpark`. Their errors can carry git
 // output or third-party names, so every handler runs through guarded() and prints cleaned text only.
 import { buildIndex, saveIndex } from '../index/index.mjs';
 import { dataDir } from '../core/paths.mjs';
 import { clean } from '../core/text.mjs';
-import { addCollection, syncCollections } from '../library/collections.mjs';
+import { addCollection, syncCollections, removeCollection } from '../library/collections.mjs';
 import { park } from '../library/park.mjs';
 import { unpark, forget } from '../library/unpark.mjs';
 import { parkPlugin } from '../library/plugin.mjs';
@@ -28,6 +28,14 @@ export const cmdSync = guarded((argv, out) => {
     else out(`${clean(r.name)}: ${r.updated ? 'updated' : 'up to date'}`);
   }
   return failed ? 1 : 0;
+});
+
+export const cmdRemove = guarded((argv, out) => {
+  const { pos } = parseArgs(argv, {});
+  if (pos.length !== 1) throw new UsageError('remove needs exactly one collection name');
+  const r = removeCollection(pos[0]);
+  out(`Removed "${clean(r.name)}": ${r.skills} skill${r.skills === 1 ? '' : 's'} from ${clean(r.path)}`);
+  return 0;
 });
 
 export const cmdPark = guarded((argv, out) => {

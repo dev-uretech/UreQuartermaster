@@ -97,8 +97,9 @@ GitHub or in CI, so a compromised account cannot ship code to those copies. Key 
 inside a release signed with the old one ([RELEASING.md](../RELEASING.md)). Automatic updates are on by default
 and can be turned off.
 
-**One copy at a time.** Every extra installed copy consumes the same budget the tool is meant to free, so
-`qm doctor` reports duplicates.
+**One copy per agent.** Every extra copy an agent loads consumes the same budget the tool is meant to free, so
+`qm doctor` reports duplicates and warns when one agent would load two copies of UreQuartermaster. A copy for each
+agent (the Claude Code plugin, plus a skills CLI copy for Codex) is the intended setup.
 
 **An acceptance test that cannot be tuned to.** About 50 realistic requests covering many kinds of work (code,
 documents, data, SEO and ads, video, sales, cloud, security, design, e-commerce, support), plus small talk that

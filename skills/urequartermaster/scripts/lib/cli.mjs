@@ -7,7 +7,7 @@ import { UsageError } from './commands/common.mjs';
 import { cmdSearch } from './commands/search.mjs';
 import { cmdLoad } from './commands/load.mjs';
 import { cmdList, cmdIndex } from './commands/list.mjs';
-import { cmdAdd, cmdSync, cmdPark, cmdUnpark } from './commands/library.mjs';
+import { cmdAdd, cmdSync, cmdRemove, cmdPark, cmdUnpark } from './commands/library.mjs';
 import { cmdInit } from './commands/init.mjs';
 import { cmdDoctor } from './commands/doctor.mjs';
 import { cmdUpdate, cmdRollback } from './commands/update.mjs';
@@ -21,6 +21,7 @@ export const USAGE = `Usage:
   qm index [--json]
   qm add <url> [--name <collection>]
   qm sync
+  qm remove <collection>
   qm park <skill>
   qm park --plugin <plugin> [--yes]
   qm unpark <skill> [--forget]
@@ -49,4 +50,4 @@ export function dispatch(argv, out, deps = {}) {
   return commands[cmd](rest, out);
 }
 
-export const COMMANDS = { update: cmdUpdate, rollback: cmdRollback, init: cmdInit, doctor: cmdDoctor, search: cmdSearch, load: cmdLoad, list: cmdList, index: cmdIndex, add: cmdAdd, sync: cmdSync, park: cmdPark, unpark: cmdUnpark };
+export const COMMANDS = { update: cmdUpdate, rollback: cmdRollback, init: cmdInit, doctor: cmdDoctor, search: cmdSearch, load: cmdLoad, list: cmdList, index: cmdIndex, add: cmdAdd, sync: cmdSync, remove: cmdRemove, park: cmdPark, unpark: cmdUnpark };

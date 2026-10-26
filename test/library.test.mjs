@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { addCollection, syncCollections } from '../skills/urequartermaster/scripts/lib/library/collections.mjs';
+import { addCollection, syncCollections, removeCollection } from '../skills/urequartermaster/scripts/lib/library/collections.mjs';
 import { park } from '../skills/urequartermaster/scripts/lib/library/park.mjs';
 import { unpark } from '../skills/urequartermaster/scripts/lib/library/unpark.mjs';
 import { parkPlugin } from '../skills/urequartermaster/scripts/lib/library/plugin.mjs';
@@ -786,4 +786,107 @@ test('Windows env lookup: with both "Path" and "PATH" the one child_process pass
   fs.mkdirSync(none);
   assert.equal(findExe('git', { Path: real }, 'win32'), path.join(real, 'git.exe'));
   assert.equal(findExe('git', { Path: real, PATH: none }, 'win32'), null);
+});
+
+// ---------------------------------------------------------------- qm remove
+gitTest('removeCollection deletes library/<name>, rebuilds the index and counts the skills', () => {
+  const s = setup();
+  const repo = makeRepo(s.root);
+  addCollection(repo, { ...s.opts, name: 'pack' });
+  addCollection(repo, { ...s.opts, name: 'keep' });
+  const r = removeCollection('Pack', s.opts);
+  assert.deepEqual(r, { name: 'pack', path: path.join(s.data, 'library', 'pack'), skills: 2 });
+  const lib = path.join(s.data, 'library');
+  assert.deepEqual(fs.readdirSync(lib).sort(), ['keep']);
+  const idx = JSON.parse(fs.readFileSync(path.join(s.data, 'index.json'), 'utf8'));
+  assert.ok(!idx.entries.some((e) => e.source === 'library:pack'));
+  assert.ok(idx.entries.some((e) => e.source === 'library:keep'));
+});
+
+test('removeCollection refuses an unknown name and says how to see the collections', () => {
+  const s = setup();
+  assert.throws(() => removeCollection('nope', s.opts), /No collection "nope"/);
+  fs.mkdirSync(path.join(s.data, 'library'), { recursive: true });
+  assert.throws(() => removeCollection('nope', s.opts), /No collection "nope".*qm list --state library/);
+});
+
+test('removeCollection refuses _parked and points to qm unpark', () => {
+  const s = setup();
+  fs.mkdirSync(path.join(s.data, 'library', '_parked', 'x'), { recursive: true });
+  for (const n of ['_parked', '_PARKED']) assert.throws(() => removeCollection(n, s.opts), /qm unpark/, n);
+  assert.ok(fs.existsSync(path.join(s.data, 'library', '_parked', 'x')));
+});
+
+test('removeCollection refuses path separators, dot names and Windows forms before touching anything', () => {
+  const s = setup();
+  const lib = path.join(s.data, 'library');
+  fs.mkdirSync(path.join(lib, 'pack', '.git'), { recursive: true });
+  const victim = path.join(s.root, 'victim');
+  fs.mkdirSync(path.join(victim, '.git'), { recursive: true });
+  const bad = ['..', '.', '../victim', '..\\victim', 'pack/..', 'a/b', 'a\\b', victim, 'C:\\victim', 'C:victim',
+    path.win32.join('..', 'victim'), '.tmp-x', 'con', 'NUL.txt', '', ' pack', 'pack\u0000', '-rf'];
+  for (const b of bad) assert.throws(() => removeCollection(b, s.opts), /Invalid collection name|qm unpark/, JSON.stringify(b));
+  assert.ok(fs.existsSync(path.join(victim, '.git')));
+  assert.ok(fs.existsSync(path.join(lib, 'pack', '.git')));
+});
+
+test('removeCollection refuses a folder that is not a git collection', () => {
+  const s = setup();
+  fs.mkdirSync(path.join(s.data, 'library', 'hand-made', 'skills'), { recursive: true });
+  assert.throws(() => removeCollection('hand-made', s.opts), /not a git collection/);
+  assert.ok(fs.existsSync(path.join(s.data, 'library', 'hand-made', 'skills')));
+});
+
+test('removeCollection refuses a collection that is a link, and never touches its target', { skip: !canSymlink && 'no symlink support' }, () => {
+  const s = setup();
+  const outside = path.join(s.root, 'outside');
+  fs.mkdirSync(path.join(outside, '.git'), { recursive: true });
+  const lib = path.join(s.data, 'library');
+  fs.mkdirSync(lib, { recursive: true });
+  fs.symlinkSync(outside, path.join(lib, 'linked'), 'junction');
+  assert.throws(() => removeCollection('linked', s.opts), /link|outside/);
+  assert.ok(fs.existsSync(path.join(outside, '.git')));
+  assert.ok(fs.lstatSync(path.join(lib, 'linked')).isSymbolicLink());
+});
+
+test('removeCollection refuses when the library folder itself is a link', { skip: !canSymlink && 'no symlink support' }, () => {
+  const s = setup();
+  const elsewhere = path.join(s.root, 'elsewhere');
+  fs.mkdirSync(path.join(elsewhere, 'pack', '.git'), { recursive: true });
+  fs.symlinkSync(elsewhere, path.join(s.data, 'library'), 'junction');
+  assert.throws(() => removeCollection('pack', s.opts), /link/);
+  assert.ok(fs.existsSync(path.join(elsewhere, 'pack', '.git')));
+});
+
+test('removeCollection does not follow links inside the collection', { skip: !canSymlink && 'no symlink support' }, () => {
+  const s = setup();
+  const outside = path.join(s.root, 'outside');
+  write(path.join(outside, 'precious.txt'), 'keep me');
+  const pack = path.join(s.data, 'library', 'pack');
+  fs.mkdirSync(path.join(pack, '.git'), { recursive: true });
+  fs.symlinkSync(outside, path.join(pack, 'out'), 'junction');
+  removeCollection('pack', s.opts);
+  assert.equal(fs.existsSync(pack), false);
+  assert.equal(fs.readFileSync(path.join(outside, 'precious.txt'), 'utf8'), 'keep me');
+});
+
+test('CLI: remove needs one name, prints what was removed, refuses _parked', () => {
+  const s = setup();
+  const run = (...a) => spawnSync(process.execPath, [QM, ...a], { env: s.env, cwd: s.cwd, encoding: 'utf8' });
+  assert.equal(run('remove').status, 2);
+  assert.equal(run('remove', 'a', 'b').status, 2);
+  assert.match(run('help').stdout, /qm remove <collection>/);
+  const unknown = run('remove', 'nope');
+  assert.equal(unknown.status, 1);
+  assert.match(unknown.stderr + unknown.stdout, /No collection "nope"/);
+  const parked = run('remove', '_parked');
+  assert.equal(parked.status, 1);
+  assert.match(parked.stderr + parked.stdout, /qm unpark/);
+  const pack = path.join(s.data, 'library', 'pack');
+  fs.mkdirSync(path.join(pack, '.git'), { recursive: true });
+  write(path.join(pack, 'skills', 'one', 'SKILL.md'), skillMd('one'));
+  const ok = run('remove', 'pack');
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(ok.stdout.trim(), `Removed "pack": 1 skill from ${pack}`);
+  assert.equal(fs.existsSync(pack), false);
 });

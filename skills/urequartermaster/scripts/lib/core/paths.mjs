@@ -77,3 +77,31 @@ export function agentLocations({
     skillsLockFile: j(home, '.agents', '.skill-lock.json'),
   };
 }
+
+/**
+ * Which skill folders each agent reads, per its documentation: Claude Code reads its own folder, the project's
+ * .claude/skills and its enabled plugins, never ~/.agents/skills (the skills CLI links skills into ~/.claude/skills
+ * for it); Codex reads ~/.agents/skills, the legacy CODEX_HOME/skills and the project's .agents/skills; OpenCode
+ * also reads the Claude and .agents folders. `home` is the agent's own folder: it exists when the agent is in use.
+ * @returns {{ agent: string, label: string, home: string, plugins: boolean, dirs: { dir: string, source: string }[] }[]}
+ */
+export function skillReaders(args = {}) {
+  const { home = os.homedir(), platform = process.platform, env = process.env, cwd = process.cwd() } = args;
+  const p = platform === 'win32' ? path.win32 : path.posix;
+  const j = (...a) => p.join(...a);
+  const loc = agentLocations({ home, platform, env, cwd });
+  const dirOf = (source) => loc.skillDirs.find((s) => s.source === source).dir;
+  const claudeDir = env.CLAUDE_CONFIG_DIR || j(home, '.claude');
+  const codexDir = env.CODEX_HOME || j(home, '.codex');
+  const opencodeDir = p.dirname(dirOf('opencode'));
+  const projClaude = { dir: j(cwd, '.claude', 'skills'), source: 'project' };
+  const projAgents = { dir: j(cwd, '.agents', 'skills'), source: 'project' };
+  const agents = { dir: dirOf('agents'), source: 'agents' };
+  return [
+    { agent: 'claude', label: 'Claude Code', home: claudeDir, plugins: true, dirs: [{ dir: dirOf('claude'), source: 'claude' }, projClaude] },
+    { agent: 'codex', label: 'Codex', home: codexDir, plugins: false, dirs: [agents, { dir: dirOf('codex'), source: 'codex' }, projAgents] },
+    { agent: 'gemini', label: 'Gemini CLI', home: p.dirname(dirOf('gemini')), plugins: false, dirs: [{ dir: dirOf('gemini'), source: 'gemini' }] },
+    { agent: 'opencode', label: 'OpenCode', home: opencodeDir, plugins: false,
+      dirs: [{ dir: dirOf('opencode'), source: 'opencode' }, { dir: j(home, '.claude', 'skills'), source: 'claude' }, agents, projClaude, projAgents] },
+  ];
+}

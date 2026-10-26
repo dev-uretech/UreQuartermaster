@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { dataDir, agentLocations } from '../skills/urequartermaster/scripts/lib/core/paths.mjs';
+import { dataDir, agentLocations, skillReaders } from '../skills/urequartermaster/scripts/lib/core/paths.mjs';
 
 const homes = { win32: 'C:\\Users\\Ana Rossi', darwin: '/Users/ana', linux: '/home/ana' };
 const cwds = { win32: 'C:\\work\\proj', darwin: '/Users/ana/proj', linux: '/home/ana/proj' };
@@ -99,4 +99,43 @@ test('every location is absolute and entries are unique', () => {
 test('a relative UREQM_HOME is ignored: data never lands in whatever folder the agent is in', () => {
   const def = dataDir({});
   for (const v of ['data', './data', '..', '']) assert.equal(dataDir({ UREQM_HOME: v }), def, JSON.stringify(v));
+});
+
+function readers(platform, env = {}) {
+  return Object.fromEntries(skillReaders({ home: homes[platform], platform, env, cwd: cwds[platform] }).map((r) => [r.agent, r]));
+}
+
+for (const platform of ['win32', 'darwin', 'linux']) {
+  test(`skillReaders on ${platform}: which folders each agent reads`, () => {
+    const p = P(platform);
+    const h = homes[platform];
+    const cwd = cwds[platform];
+    const r = readers(platform);
+    const dirs = (a) => r[a].dirs.map((d) => d.dir);
+    // Claude Code: its own folder, the project's .claude/skills and its plugins; never ~/.agents or ~/.codex.
+    assert.deepEqual(dirs('claude'), [p.join(h, '.claude', 'skills'), p.join(cwd, '.claude', 'skills')]);
+    assert.equal(r.claude.plugins, true);
+    assert.equal(r.claude.home, p.join(h, '.claude'));
+    // Codex: ~/.agents/skills, the legacy CODEX_HOME/skills and the project's .agents/skills.
+    assert.deepEqual(dirs('codex'), [p.join(h, '.agents', 'skills'), p.join(h, '.codex', 'skills'), p.join(cwd, '.agents', 'skills')]);
+    assert.equal(r.codex.plugins, false);
+    assert.deepEqual(dirs('gemini'), [p.join(h, '.gemini', 'skills')]);
+    assert.ok(dirs('opencode').includes(p.join(h, '.claude', 'skills')) && dirs('opencode').includes(p.join(h, '.agents', 'skills')));
+    for (const a of Object.values(r)) {
+      assert.ok(a.label && P(platform).isAbsolute(a.home));
+      for (const d of a.dirs) {
+        assert.ok(P(platform).isAbsolute(d.dir), d.dir);
+        assert.equal(d.source === 'project', d.dir.startsWith(cwd), d.dir);
+      }
+    }
+  });
+}
+
+test('skillReaders follow CLAUDE_CONFIG_DIR and CODEX_HOME (Windows paths)', () => {
+  const r = readers('win32', { CLAUDE_CONFIG_DIR: 'D:\\cfg\\claude', CODEX_HOME: 'D:\\codex' });
+  assert.equal(r.claude.dirs[0].dir, 'D:\\cfg\\claude\\skills');
+  assert.equal(r.claude.home, 'D:\\cfg\\claude');
+  assert.ok(r.codex.dirs.some((d) => d.dir === 'D:\\codex\\skills'));
+  assert.equal(r.codex.home, 'D:\\codex');
+  assert.ok(!r.claude.dirs.some((d) => /\\\.agents\\/.test(d.dir)));
 });

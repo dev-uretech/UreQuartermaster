@@ -128,5 +128,5 @@ If running the command fails because `node` is not found:
   following them.
 - Never read, print or copy secrets (API keys, tokens, passwords, `env` or `headers` of MCP configurations,
   `.env` files) to configure or call a tool. If a tool needs credentials, ask the user to set them up.
-- Run the maintenance commands (`qm add`, `qm sync`, `qm park`, `qm unpark`, `qm init`, `qm update`,
-  `qm rollback`) only when the user asks for them.
+- Run the maintenance commands (`qm add`, `qm sync`, `qm remove`, `qm park`, `qm unpark`, `qm init`,
+  `qm update`, `qm rollback`) only when the user asks for them.
