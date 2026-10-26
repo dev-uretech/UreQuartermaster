@@ -89,7 +89,7 @@ export function doctor(opts = {}) {
   } catch { readers = []; }
 
   const claude = readers.find((r) => r.agent === 'claude');
-  if (claude) {
+  if (claude && claude.used) {
     const listed = claude.skills.filter((e) => !e.duplicateOf);
     const size = listingSize(listed);
     const what = `~${fmt(size)} characters for ${listed.length} skill${listed.length === 1 ? '' : 's'}`;

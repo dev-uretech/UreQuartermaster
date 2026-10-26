@@ -890,3 +890,11 @@ test('CLI: remove needs one name, prints what was removed, refuses _parked', () 
   assert.equal(ok.stdout.trim(), `Removed "pack": 1 skill from ${pack}`);
   assert.equal(fs.existsSync(pack), false);
 });
+
+gitTest('removeCollection refuses a name ending with a dot (Windows would open the folder without it)', () => {
+  const s = setup();
+  const repo = makeRepo(s.root);
+  addCollection(repo, { ...s.opts, name: 'pack' });
+  assert.throws(() => removeCollection('pack.', s.opts), /do not end with "\."/);
+  assert.ok(fs.existsSync(path.join(s.data, 'library', 'pack')));
+});

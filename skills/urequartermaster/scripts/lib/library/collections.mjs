@@ -74,6 +74,8 @@ export function removeCollection(name, opts = {}) {
   const r = resolve(opts);
   if (String(name).toLowerCase() === PARKED) throw new Error(`"${PARKED}" holds parked skills, not a collection: restore one with "qm unpark <skill>".`);
   const n = checkName(name);
+  // Windows drops a trailing dot: "pack." would open the folder "pack"
+  if (n.endsWith('.')) throw new Error(`Collection names do not end with ".": ${n}`);
   const lib = path.join(r.dataDir, 'library');
   if (lstat(lib)?.isSymbolicLink()) throw new Error(`${lib} is a symbolic link: refusing to use it.`);
   const dest = path.join(lib, n);
@@ -85,8 +87,10 @@ export function removeCollection(name, opts = {}) {
   const skills = scanSkills(none, { dataDir: r.dataDir }).filter((e) => e.source === `library:${n}`).length;
   const tmp = path.join(lib, `.tmp-remove-${n}-${process.pid}-${Date.now()}`);
   fs.renameSync(dest, tmp);
-  try { fs.rmSync(tmp, { recursive: true, force: true }); }
-  catch (e) { throw new Error(`"${n}" is out of the library, but its files could not all be deleted (${e.code || e.message}): ${tmp} is removed on a later qm add, or delete it by hand.`); }
-  finally { rebuild(r); }
+  let failed = null;
+  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { failed = e; }
+  // the index must forget the collection even when the files could not all be deleted
+  try { rebuild(r); } catch (e) { if (!failed) throw e; }
+  if (failed) throw new Error(`"${n}" is out of the library, but its files could not all be deleted (${failed.code || failed.message}): delete ${tmp} by hand, or a later qm add or qm park removes it once it is an hour old.`);
   return { name: n, path: dest, skills };
 }

@@ -266,3 +266,12 @@ test('the hook line says whether the Claude Code plugin that runs it is enabled'
   write(path.join(s.home, '.claude', 'settings.json'), JSON.stringify({ enabledPlugins: { 'urequartermaster@urequartermaster': true } }));
   assert.match(msgs(doctor(s.opts), 'ok').join('\n'), /Prompt hook enabled/);
 });
+
+test('no Claude Code skill listing line when Claude Code is not in use', () => {
+  const s = setup();
+  write(path.join(s.home, '.codex', 'skills', 'only-codex', 'SKILL.md'), skillMd('only-codex', 'x'));
+  fs.rmSync(path.join(s.home, '.claude'), { recursive: true, force: true });
+  s.index();
+  const r = doctor(s.opts);
+  assert.ok(!JSON.stringify(r).includes('Claude Code skill listing'), JSON.stringify(r));
+});
