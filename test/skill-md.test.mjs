@@ -66,6 +66,16 @@ test('SKILL.md frontmatter: name, and a description that survives truncation', (
   assert.equal(parsed.description, fm.description);
 });
 
+test('SKILL.md saved with CRLF (and a BOM) by a Windows editor is read exactly like the LF original', () => {
+  const lf = fs.readFileSync(SKILL, 'utf8');
+  const parsed = parseSkillFile(lf, 'urequartermaster');
+  const crlf = lf.replace(/\n/g, '\r\n');
+  assert.ok(crlf.includes('\r\n'));
+  assert.deepEqual(parseSkillFile(crlf, 'urequartermaster'), parsed);
+  assert.deepEqual(parseSkillFile(`\uFEFF${crlf}`, 'urequartermaster'), parsed);
+  assert.ok(parsed.headings.length > 0);
+});
+
 test('SKILL.md body: required sections, short', () => {
   const { body } = frontmatter(fs.readFileSync(SKILL, 'utf8'));
   for (const h of ['## When to use', '## Procedure', '## Loading what you found', '## Without Node.js', '## Safety']) {

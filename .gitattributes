@@ -1,0 +1,3 @@
+# Check out text files with LF on every OS: SKILL.md and the shipped scripts are byte-identical
+# everywhere, so release hashes and the strict SKILL.md checks do not depend on core.autocrlf.
+* text=auto eol=lf
