@@ -1,0 +1,395 @@
+{
+  "note": "Fixed, reproducible tool catalog for the acceptance test. Collections are pinned to a commit: \"HEAD\" is resolved to a SHA by build-catalog.mjs and written back here, so later runs use the same content. `roots` are folders whose direct children are skills (one * segment allowed); `installed` lists the skills copied into the agents' skill folders, every other skill of the collection goes to the library. placement \"library\" puts the whole collection in the library.",
+  "collections": [
+    {
+      "name": "anthropics-skills",
+      "url": "https://github.com/anthropics/skills.git",
+      "commit": "dbd4588f9e1033efb41dad4bef2f7947c8993d44",
+      "placement": "installed",
+      "agents": [
+        "claude",
+        "codex"
+      ],
+      "roots": [
+        "skills"
+      ],
+      "installed": [
+        "pdf",
+        "docx",
+        "xlsx",
+        "pptx",
+        "skill-creator",
+        "frontend-design",
+        "mcp-builder",
+        "webapp-testing",
+        "claude-api",
+        "canvas-design",
+        "theme-factory",
+        "doc-coauthoring"
+      ]
+    },
+    {
+      "name": "google-skills",
+      "url": "https://github.com/google/skills.git",
+      "commit": "af339ff8c70051261c02463ea842173cc85640b2",
+      "placement": "library",
+      "agents": [
+        "claude",
+        "codex"
+      ],
+      "roots": [
+        "skills/*"
+      ]
+    },
+    {
+      "name": "vercel-agent-skills",
+      "url": "https://github.com/vercel-labs/agent-skills.git",
+      "commit": "063bee94c3f4df8453406c830b0a7df0f2860278",
+      "placement": "installed",
+      "agents": [
+        "claude",
+        "codex"
+      ],
+      "roots": [
+        "skills"
+      ],
+      "installed": [
+        "react-best-practices",
+        "deploy-to-vercel",
+        "web-design-guidelines",
+        "composition-patterns",
+        "react-native-skills"
+      ]
+    },
+    {
+      "name": "superpowers",
+      "url": "https://github.com/obra/superpowers.git",
+      "commit": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b",
+      "placement": "installed",
+      "agents": [
+        "claude",
+        "codex"
+      ],
+      "roots": [
+        "skills"
+      ],
+      "installed": [
+        "brainstorming",
+        "writing-plans",
+        "executing-plans",
+        "test-driven-development",
+        "systematic-debugging",
+        "verification-before-completion",
+        "requesting-code-review",
+        "receiving-code-review",
+        "using-git-worktrees",
+        "finishing-a-development-branch",
+        "subagent-driven-development",
+        "dispatching-parallel-agents"
+      ]
+    },
+    {
+      "name": "claude-seo",
+      "url": "https://github.com/AgriciDaniel/claude-seo.git",
+      "commit": "6be93f45064ffbadced572b5d5c95f55fd263af0",
+      "placement": "installed",
+      "agents": [
+        "claude",
+        "codex"
+      ],
+      "roots": [
+        "skills",
+        "extensions/*/skills"
+      ],
+      "installed": [
+        "seo",
+        "seo-audit",
+        "seo-page",
+        "seo-technical",
+        "seo-content",
+        "seo-schema",
+        "seo-geo",
+        "seo-google",
+        "seo-local",
+        "seo-sitemap",
+        "seo-images",
+        "seo-backlinks",
+        "seo-plan",
+        "seo-hreflang",
+        "seo-competitor-pages",
+        "seo-content-brief"
+      ]
+    },
+    {
+      "name": "claude-blog",
+      "url": "https://github.com/AgriciDaniel/claude-blog.git",
+      "commit": "354442348815a7f0327077ad89af2c43cf4b4ab4",
+      "placement": "installed",
+      "agents": [
+        "claude",
+        "codex"
+      ],
+      "roots": [
+        "skills"
+      ],
+      "installed": [
+        "blog",
+        "blog-write",
+        "blog-rewrite",
+        "blog-analyze",
+        "blog-outline",
+        "blog-brief",
+        "blog-seo-check",
+        "blog-audit",
+        "blog-strategy",
+        "blog-calendar"
+      ]
+    },
+    {
+      "name": "hyperframes",
+      "url": "https://github.com/heygen-com/hyperframes.git",
+      "commit": "7f5d6ed2036f83cb2d3048e1150909a29d9b43ce",
+      "placement": "installed",
+      "agents": [
+        "claude",
+        "codex"
+      ],
+      "roots": [
+        "skills"
+      ],
+      "installed": [
+        "hyperframes",
+        "hyperframes-cli",
+        "media-use"
+      ]
+    },
+    {
+      "name": "impeccable",
+      "url": "https://github.com/pbakaus/impeccable.git",
+      "commit": "658b4ce2942171ed5b3b3bec7e9d99456ba86e5e",
+      "placement": "installed",
+      "agents": [
+        "claude",
+        "codex"
+      ],
+      "roots": [
+        "plugin/skills"
+      ],
+      "installed": [
+        "impeccable"
+      ]
+    }
+  ],
+  "mcp": [
+    {
+      "name": "google-search-console",
+      "description": "Google Search Console: search analytics (clicks, impressions, queries, pages), sitemaps and URL inspection for verified sites",
+      "tools": [
+        {
+          "name": "list_sites",
+          "description": "List the Search Console properties the user can access"
+        },
+        {
+          "name": "search_analytics",
+          "description": "Query clicks, impressions, CTR and position by query, page, country or device"
+        },
+        {
+          "name": "inspect_url",
+          "description": "Inspect the index status of a URL"
+        }
+      ]
+    },
+    {
+      "name": "google-ads",
+      "description": "Google Ads API: campaigns, ad groups, keywords, budgets and performance reports",
+      "tools": [
+        {
+          "name": "list_campaigns",
+          "description": "List Google Ads campaigns with status and budget"
+        },
+        {
+          "name": "run_report",
+          "description": "Run a GAQL performance report (cost, conversions, ROAS)"
+        }
+      ]
+    },
+    {
+      "name": "ga4",
+      "description": "Google Analytics 4: traffic, audiences, events and conversion reports for GA4 properties",
+      "tools": [
+        {
+          "name": "run_report",
+          "description": "Run a GA4 report by dimensions and metrics over a date range"
+        },
+        {
+          "name": "run_realtime_report",
+          "description": "Real-time active users and events"
+        },
+        {
+          "name": "list_properties",
+          "description": "List GA4 accounts and properties"
+        }
+      ]
+    },
+    {
+      "name": "stripe",
+      "description": "Stripe: customers, payments, subscriptions, invoices, refunds and products",
+      "tools": [
+        {
+          "name": "list_customers",
+          "description": "List or search Stripe customers"
+        },
+        {
+          "name": "list_invoices",
+          "description": "List invoices and their payment status"
+        },
+        {
+          "name": "create_refund",
+          "description": "Refund a payment"
+        }
+      ]
+    },
+    {
+      "name": "hubspot",
+      "description": "HubSpot CRM: contacts, companies, deals, pipelines, tickets and marketing email",
+      "tools": [
+        {
+          "name": "search_contacts",
+          "description": "Search CRM contacts by email, name or property"
+        },
+        {
+          "name": "list_deals",
+          "description": "List deals in a pipeline stage"
+        },
+        {
+          "name": "create_note",
+          "description": "Add a note to a contact, company or deal"
+        }
+      ]
+    },
+    {
+      "name": "slack",
+      "description": "Slack: read channels and threads, search messages, post messages and look up users",
+      "tools": [
+        {
+          "name": "list_channels",
+          "description": "List Slack channels"
+        },
+        {
+          "name": "search_messages",
+          "description": "Search messages across the workspace"
+        },
+        {
+          "name": "post_message",
+          "description": "Post a message to a channel or thread"
+        }
+      ]
+    },
+    {
+      "name": "github",
+      "description": "GitHub: repositories, issues, pull requests, code search, branches and Actions workflow runs",
+      "tools": [
+        {
+          "name": "search_issues",
+          "description": "Search issues and pull requests"
+        },
+        {
+          "name": "get_pull_request",
+          "description": "Read a pull request with its diff and review comments"
+        },
+        {
+          "name": "create_issue",
+          "description": "Open an issue in a repository"
+        }
+      ]
+    },
+    {
+      "name": "postgres",
+      "description": "PostgreSQL: inspect schemas and run read-only SQL queries against the configured database",
+      "tools": [
+        {
+          "name": "query",
+          "description": "Run a read-only SQL query"
+        },
+        {
+          "name": "list_tables",
+          "description": "List tables and columns of the database"
+        }
+      ]
+    },
+    {
+      "name": "sentry",
+      "description": "Sentry: application errors, issues, stack traces, releases and performance traces",
+      "tools": [
+        {
+          "name": "list_issues",
+          "description": "List unresolved Sentry issues for a project"
+        },
+        {
+          "name": "get_issue",
+          "description": "Get an issue with its latest event and stack trace"
+        }
+      ]
+    },
+    {
+      "name": "figma",
+      "description": "Figma: read design files, frames, components, styles and variables, and export assets",
+      "tools": [
+        {
+          "name": "get_file",
+          "description": "Read a Figma file structure"
+        },
+        {
+          "name": "get_design_context",
+          "description": "Get layout, styles and component data for a frame"
+        },
+        {
+          "name": "export_node",
+          "description": "Export a node as PNG, SVG or PDF"
+        }
+      ]
+    }
+  ],
+  "clis": [
+    {
+      "name": "gh",
+      "description": "GitHub CLI: repositories, issues, pull requests, releases, Actions and the GitHub API"
+    },
+    {
+      "name": "gcloud",
+      "description": "Google Cloud CLI: projects, Compute Engine, Cloud Run, IAM and other Google Cloud services"
+    },
+    {
+      "name": "kubectl",
+      "description": "Kubernetes CLI: inspect and manage clusters, pods, deployments and logs"
+    },
+    {
+      "name": "terraform",
+      "description": "Terraform: plan and apply infrastructure as code"
+    },
+    {
+      "name": "docker",
+      "description": "Docker: build, run and manage containers and images"
+    },
+    {
+      "name": "aws",
+      "description": "AWS CLI: manage Amazon Web Services resources (S3, EC2, Lambda, IAM, ...)"
+    },
+    {
+      "name": "ffmpeg",
+      "description": "FFmpeg: convert, cut, encode and inspect audio and video"
+    },
+    {
+      "name": "pandoc",
+      "description": "Pandoc: convert documents between Markdown, HTML, DOCX, PDF and more"
+    },
+    {
+      "name": "wp",
+      "description": "WP-CLI: manage WordPress sites, plugins, users, options and the database"
+    },
+    {
+      "name": "vercel",
+      "description": "Vercel CLI: deploy and manage Vercel projects"
+    }
+  ]
+}

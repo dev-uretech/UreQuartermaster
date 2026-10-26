@@ -1,0 +1,20 @@
+{
+  "name": "urequartermaster",
+  "description": "You're set: every skill, MCP server, plugin and CLI you already have, found and used for you. Indexes your local tools so the agent searches them before each non-trivial request.",
+  "version": "1.0.0",
+  "author": {
+    "name": "UreTech"
+  },
+  "homepage": "https://github.com/dev-uretech/UreQuartermaster",
+  "repository": "https://github.com/dev-uretech/UreQuartermaster",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "mcp",
+    "plugins",
+    "cli",
+    "search",
+    "tool-discovery",
+    "agent-skills"
+  ]
+}
