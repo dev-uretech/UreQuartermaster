@@ -6,6 +6,7 @@ import { benchEnv, benchKeychainCommands } from '../eval/bench.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const j = (...events) => events.map((e) => JSON.stringify(e)).join('\n');
 // Claude Code stream-json shapes
@@ -181,7 +182,7 @@ test('requests use the plan format and expand to one entry per language present 
     { id: 'r1', lang: 'it', prompt: 'I', expected: ['skill:pdf'], category: 'docs', group: 'g' },
     { id: 'r1', lang: 'en', prompt: 'E', expected: ['skill:pdf'], category: 'docs', group: 'g' },
   ]);
-  const dev = loadRequests(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'eval', 'requests', 'dev.jsonl'));
+  const dev = loadRequests(fileURLToPath(new URL('../eval/requests/dev.jsonl', import.meta.url)));
   assert.equal(dev.length, 180); // 30 requests x 6 languages
   assert.deepEqual([...new Set(dev.map((r) => r.lang))].sort(), ['de', 'en', 'es', 'fr', 'it', 'pt']);
 });
