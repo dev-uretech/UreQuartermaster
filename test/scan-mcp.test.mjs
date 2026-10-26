@@ -12,6 +12,9 @@ const R = '«redacted»';
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'qm-mcp-'));
 const write = (f, o) => { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, typeof o === 'string' ? o : JSON.stringify(o)); };
 const cfg = (mcpDescriptions = {}) => ({ clis: [], mcpDescriptions });
+// The output holds file paths under a mkdtemp folder whose random 6-character suffix can contain a
+// short probe such as "x7" by chance: mask it so leak checks only look at what scanMcp produced.
+const outText = (out) => JSON.stringify(out).replace(/qm-mcp-[A-Za-z0-9]{6}/g, 'qm-mcp-TMPDIR');
 
 // Fake homes only: env is empty so CLAUDE_CONFIG_DIR/CODEX_HOME never point at real folders.
 function setup() {
@@ -47,7 +50,7 @@ const S = {
 const ALL = Object.values(S);
 
 function assertNoSecrets(out) {
-  const text = JSON.stringify(out);
+  const text = outText(out);
   for (const s of ALL) assert.ok(!text.includes(s), `secret leaked: ${s.slice(0, 6)}…`);
   for (const w of ['Bearer', 'environment', 'headers']) assert.ok(!text.includes(w), `leaked word ${w}`);
 }
@@ -61,7 +64,7 @@ test('never keeps env or headers', () => {
     },
   });
   const out = scanMcp(s.locations, cfg());
-  const text = JSON.stringify(out);
+  const text = outText(out);
   assert.ok(!text.includes('s3cret'));
   assert.ok(!text.includes('Bearer'));
   assert.deepEqual(out.map((e) => e.id).sort(), ['mcp:local', 'mcp:remote']);
@@ -353,7 +356,7 @@ test('--flag value pairs inside one string (sh -c, cmd /c, command string), end 
     one: { command: 'npx srv --api-key akSHORT4 --secret=scSHORT5' },
   } });
   write(path.join(s.home, '.codex', 'config.toml'), '[mcp_servers.cx]\ncommand = "npx srv --password pwSHORT6"\n');
-  const text = JSON.stringify(scanMcp(s.locations, cfg()));
+  const text = outText(scanMcp(s.locations, cfg()));
   for (const leak of ['tokSHORT1', 'pwSHORT2', 'akSHORT3', 'akSHORT4', 'scSHORT5', 'pwSHORT6']) assert.ok(!text.includes(leak), leak);
   assert.ok(text.includes('stdio MCP server: sh"'));
 });
@@ -381,7 +384,7 @@ test('new secret words, DB client -p, user:password', () => {
   assert.deepEqual(redactArgs(['-u', 'user:pw1', '--user=admin:pw2', '-u', 'plain']), ['-u', `user:${R}`, `--user=admin:${R}`, '-u', 'plain']);
   const s = setup();
   write(path.join(s.home, '.claude.json'), { mcpServers: { db: { command: 'mariadb', args: ['-pDBLEAK9'] } } });
-  assert.ok(!JSON.stringify(scanMcp(s.locations, cfg())).includes('DBLEAK9'));
+  assert.ok(!outText(scanMcp(s.locations, cfg())).includes('DBLEAK9'));
 });
 
 test('userinfo containing @ is hidden up to the last @ before the path', () => {
@@ -419,7 +422,7 @@ test('only Codex and OpenCode disabled servers are skipped', () => {
 function leaksEndToEnd(servers, leaks) {
   const s = setup();
   write(path.join(s.home, '.claude.json'), { mcpServers: servers });
-  const text = JSON.stringify(scanMcp(s.locations, cfg()));
+  const text = outText(scanMcp(s.locations, cfg()));
   for (const l of leaks) assert.ok(!text.includes(l), `leaked ${l}`);
   return text;
 }
@@ -549,7 +552,7 @@ test('values after secret or unknown flags never become description tokens', () 
   };
   const s = setup();
   write(path.join(s.home, '.claude.json'), { mcpServers: servers });
-  const text = JSON.stringify(scanMcp(s.locations, cfg()));
+  const text = outText(scanMcp(s.locations, cfg()));
   for (const leak of [pw, 'myp4ss', 'p4ssw0rd', 'cmdstr-leak9', 'evalleak', 'psleak']) assert.ok(!text.includes(leak), `leaked ${leak}`);
   const d = descOf(servers);
   assert.equal(d.k5, 'stdio MCP server: docker mcp/img');
