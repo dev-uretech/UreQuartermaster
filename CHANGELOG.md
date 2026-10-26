@@ -2,6 +2,19 @@
 
 All notable changes to UreQuartermaster. Versions follow semantic versioning; each release is tagged `vX.Y.Z`.
 
+## 1.0.2
+
+- `qm remove <collection>` removes a git collection added with `qm add` from the library and rebuilds the index.
+  It refuses unknown names, the `_parked` folder (parked skills come back with `qm unpark`), names with path
+  separators or `..`, links, and folders that are not git clones.
+- `qm doctor` no longer warns about several copies of UreQuartermaster when each agent has its own (for example the
+  Claude Code plugin plus a skills CLI copy for Codex in `~/.agents/skills`, which Claude Code does not read). It
+  warns only when one agent would load two copies, and otherwise prints which agent uses which copy.
+- `qm doctor` no longer warns past 60 installed skills: Claude Code has no documented skill-count limit. It now
+  estimates the size of Claude Code's skill listing (names plus descriptions of the skills Claude Code reads, each
+  description capped at 1,536 characters) and warns only above 8,000 characters, the budget Claude Code uses when
+  the context window is unknown.
+
 ## 1.0.1
 
 - When a skill refers to another skill that is not installed (for example a sub-skill moved to the library
