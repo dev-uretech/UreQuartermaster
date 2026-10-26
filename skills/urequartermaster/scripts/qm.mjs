@@ -2,8 +2,10 @@
 // qm: entry point. Dispatches to lib/cli.mjs; exit codes 0 ok, 2 bad arguments, 1 errors.
 import { dispatch, USAGE, UsageError } from './lib/cli.mjs';
 
-// The reader went away (`qm list | head`): stop quietly, as other command-line tools do.
-process.stdout.on('error', (e) => { if (e && e.code === 'EPIPE') process.exit(0); throw e; });
+// The reader went away (`qm list | head`): stop quietly, as other command-line tools do. A pipe
+// reports EPIPE; the socket a Node parent gives as stdout can report ENOTCONN (macOS) or ECONNRESET.
+const READER_GONE = new Set(['EPIPE', 'ENOTCONN', 'ECONNRESET']);
+process.stdout.on('error', (e) => { if (e && READER_GONE.has(e.code)) process.exit(0); throw e; });
 const out = (s) => process.stdout.write(`${s}\n`);
 
 function fail(e) {
