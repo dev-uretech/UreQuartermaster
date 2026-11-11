@@ -44,7 +44,7 @@ export function computeFingerprint(opts = {}) {
     watched.add(path.join(r.dataDir, 'config.json'));
     const lines = [...watched].sort().map((p) => `${p}|${mtimeOf(p)}`);
     lines.push(`enabledPlugins|${JSON.stringify(enabledPlugins(loc.claudeSettingsFile))}`);
-    const mcp = mcpFingerprint(loc.mcpConfigs, { maxBytes: opts.mcpMaxBytes ?? Infinity });
+    const mcp = mcpFingerprint(loc.mcpConfigs, { maxBytes: opts.mcpMaxBytes ?? Infinity, mcpOff: loc.mcpOff });
     return `${sha(lines.join('\n'))}.${mcp === null ? '*' : sha(mcp)}`;
   } catch {
     return `${sha('error')}.${sha('error')}`;

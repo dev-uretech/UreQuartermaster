@@ -80,6 +80,7 @@ Act on the `use:` line of each chosen hit:
 | `<command> --help` | command-line program | Run `<command> --help` if you need the syntax, then use it. |
 | `Plugin <p>: skills appear as <p>:<skill>` | enabled plugin | Use its skills by those names. |
 | `claude plugin enable <key>` | disabled plugin | Do not enable it. Use its skills through `qm load` if the search listed them. |
+| `qm mcp enable <name> …` | MCP server that does not run here: `parked` (kept off to save memory), `off` (configured only in other projects) or `disabled` (switched off for this project) | Its tools are not in this session. If the task needs it, run `node "<this skill's directory>/scripts/qm.mjs" mcp enable <name>` (current project only) and tell the user it works from the next Claude Code session in this folder (Claude Code starts MCP servers when a session starts). Meanwhile do what you can without it. When the task is done, suggest switching it off again with `qm mcp disable <name>`. |
 
 What `qm load` prints: `# Skill: <name>`, `# Base directory: <folder>`, a notice, then the skill's SKILL.md.
 Follow those instructions for the current task. Resolve every relative path in them (`scripts/…`,
@@ -129,4 +130,5 @@ If running the command fails because `node` is not found:
 - Never read, print or copy secrets (API keys, tokens, passwords, `env` or `headers` of MCP configurations,
   `.env` files) to configure or call a tool. If a tool needs credentials, ask the user to set them up.
 - Run the maintenance commands (`qm add`, `qm sync`, `qm remove`, `qm park`, `qm unpark`, `qm init`,
-  `qm update`, `qm rollback`) only when the user asks for them.
+  `qm update`, `qm rollback`, `qm mcp apply`, `qm mcp restore`) only when the user asks for them. `qm mcp enable`
+  for the current project is fine when the task needs that server; `qm mcp disable` only after the user agrees.

@@ -11,13 +11,14 @@ import { cmdAdd, cmdSync, cmdRemove, cmdPark, cmdUnpark } from './commands/libra
 import { cmdInit } from './commands/init.mjs';
 import { cmdDoctor } from './commands/doctor.mjs';
 import { cmdUpdate, cmdRollback } from './commands/update.mjs';
+import { cmdMcp } from './commands/mcp.mjs';
 
 export { UsageError };
 
 export const USAGE = `Usage:
   qm search <query>... [--limit N] [--kind skill|mcp|plugin|cli] [--json]
   qm load <name|id>
-  qm list [--kind skill|mcp|plugin|cli] [--state installed|library|plugin-disabled|available] [--all]
+  qm list [--kind skill|mcp|plugin|cli] [--state installed|library|plugin-disabled|available|parked|off|disabled] [--all]
   qm index [--json]
   qm add <url> [--name <collection>]
   qm sync
@@ -25,6 +26,12 @@ export const USAGE = `Usage:
   qm park <skill>
   qm park --plugin <plugin> [--yes]
   qm unpark <skill> [--forget]
+  qm mcp usage [--days N] [--json]
+  qm mcp plan [--days N] [--min-projects N] [--json]
+  qm mcp apply [--days N] [--min-projects N]
+  qm mcp enable <server> [--project PATH]
+  qm mcp disable <server> [--project PATH]
+  qm mcp restore <server> [--project PATH | --user]
   qm init [--remove] [--dry-run] [--agent claude|codex|gemini|copilot|opencode]
   qm doctor
   qm update [--check]
@@ -50,4 +57,4 @@ export function dispatch(argv, out, deps = {}) {
   return commands[cmd](rest, out);
 }
 
-export const COMMANDS = { update: cmdUpdate, rollback: cmdRollback, init: cmdInit, doctor: cmdDoctor, search: cmdSearch, load: cmdLoad, list: cmdList, index: cmdIndex, add: cmdAdd, sync: cmdSync, remove: cmdRemove, park: cmdPark, unpark: cmdUnpark };
+export const COMMANDS = { update: cmdUpdate, rollback: cmdRollback, init: cmdInit, doctor: cmdDoctor, search: cmdSearch, load: cmdLoad, list: cmdList, index: cmdIndex, add: cmdAdd, sync: cmdSync, remove: cmdRemove, park: cmdPark, unpark: cmdUnpark, mcp: cmdMcp };

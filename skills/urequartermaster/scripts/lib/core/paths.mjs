@@ -74,6 +74,8 @@ export function agentLocations({
     pluginCache: j(claudeDir, 'plugins', 'cache'),
     installedPluginsFile: j(claudeDir, 'plugins', 'installed_plugins.json'),
     claudeSettingsFile: j(claudeDir, 'settings.json'), // enabledPlugins lives here
+    claudeJson, // user and local MCP scopes, per-project MCP toggles
+    claudeTranscripts: j(claudeDir, 'projects'), // session transcripts, read by qm mcp usage
     skillsLockFile: j(home, '.agents', '.skill-lock.json'),
   };
 }

@@ -10,6 +10,8 @@ import { isObj } from '../core/files.mjs';
 import { readText, parseJsonLoose } from './mcp/jsonc.mjs';
 import { parseTomlServers } from './mcp/toml.mjs';
 import { describe } from './mcp/describe.mjs';
+import { readJsonObject } from '../core/files.mjs';
+import { isSafeMcpName } from '../core/mcp-store.mjs';
 
 const MAX_TOML = 8 * 1024 * 1024; // config.toml is tiny; the subset parser is kept on a short leash
 
@@ -34,7 +36,7 @@ function pickServers(doc, pick) {
 // Others (Claude, Gemini, Cursor, VS Code, Copilot) may ignore such a field: their servers stay listed.
 const HONOURS_ENABLED = new Set(['opencode']);
 
-function normalize(def, agent) {
+export function normalize(def, agent) {
   if (!isObj(def)) return null;
   if (HONOURS_ENABLED.has(agent) && def.enabled === false) return null; // switched off in its config
   let command = null;
@@ -52,7 +54,7 @@ function normalize(def, agent) {
   return { type, command, args, url };
 }
 
-function pluginServerSources(locations) {
+export function pluginServerSources(locations) {
   const out = [];
   let plugins = [];
   try { plugins = listClaudePlugins(locations); } catch { plugins = []; }
@@ -106,13 +108,16 @@ export function scanMcp(locations, config) {
 
   const out = [];
   const kept = new Map();
+  const describeOf = (name, server) => {
+    const custom = own(descriptions, name) && str(descriptions[name]) && descriptions[name].trim() ? descriptions[name].trim() : null;
+    return custom || describe(server);
+  };
   const dupCount = new Map();
   for (const { name, source, file, def, tools } of found) {
     const server = normalize(def, source);
     if (!server) continue;
-    const custom = own(descriptions, name) && str(descriptions[name]) && descriptions[name].trim() ? descriptions[name].trim() : null;
     const entry = {
-      id: `mcp:${name}`, kind: 'mcp', name, description: custom || describe(server), headings: [],
+      id: `mcp:${name}`, kind: 'mcp', name, description: describeOf(name, server), headings: [],
       path: file, source, state: 'installed', usage: `MCP server ${name}${tools ? ` (Claude Code tools: ${tools})` : ''}`,
     };
     const first = kept.get(name);
@@ -123,7 +128,41 @@ export function scanMcp(locations, config) {
       out.push({ ...entry, id: k === 1 ? base : `${base}#${k}`, duplicateOf: first.id });
     } else { kept.set(name, entry); out.push(entry); }
   }
+  for (const o of offServers(locations && locations.mcpOff, docs)) {
+    if (kept.has(o.name)) continue;
+    const server = normalize(o.def, 'claude');
+    if (!server) continue;
+    kept.set(o.name, true);
+    out.push({
+      id: `mcp:${o.name}`, kind: 'mcp', name: o.name, description: describeOf(o.name, server), headings: [],
+      path: o.file, source: 'claude', state: o.state,
+      usage: `qm mcp enable ${o.name} (adds it to the current project in Claude Code; it starts from the next session)`,
+    });
+  }
   return out;
+}
+
+/**
+ * Claude Code servers that exist but do not run here: parked by qm (in the parked store) or configured only in
+ * other projects' local scope ('off'). Names that are not shell-inert are left out (the agent would put them on a
+ * command line). `mcpOff` is { claudeJson, storeFile }; null or missing files give nothing.
+ */
+function offServers(mcpOff, docs = new Map()) {
+  if (!mcpOff || !str(mcpOff.claudeJson)) return [];
+  const out = new Map();
+  const store = str(mcpOff.storeFile) ? readJsonObject(mcpOff.storeFile) : null;
+  if (store && store.version === 1 && isObj(store.servers)) {
+    for (const [n, s] of Object.entries(store.servers)) if (isObj(s) && isObj(s.definition)) out.set(n, { name: n, def: s.definition, state: 'parked', file: mcpOff.storeFile });
+  }
+  if (!docs.has(mcpOff.claudeJson)) docs.set(mcpOff.claudeJson, parseJsonLoose(readText(mcpOff.claudeJson)));
+  const doc = docs.get(mcpOff.claudeJson);
+  if (doc && isObj(doc.projects)) {
+    for (const e of Object.values(doc.projects)) {
+      if (!isObj(e) || !isObj(e.mcpServers)) continue;
+      for (const [n, d] of Object.entries(e.mcpServers)) if (!out.has(n)) out.set(n, { name: n, def: d, state: 'off', file: mcpOff.claudeJson });
+    }
+  }
+  return [...out.values()].filter((x) => isSafeMcpName(x.name));
 }
 
 /**
@@ -133,16 +172,17 @@ export function scanMcp(locations, config) {
  * fields are in it, never env, headers or raw args. Plugin servers are not included.
  * null when a file is larger than `maxBytes`.
  */
-export function mcpFingerprint(mcpConfigs, { maxBytes = Infinity } = {}) {
+export function mcpFingerprint(mcpConfigs, { maxBytes = Infinity, mcpOff = null } = {}) {
   try {
     // A caller with a time budget (the hook) gives up on files too large to parse quickly.
-    for (const c of mcpConfigs) {
+    const files = [...mcpConfigs.map((c) => c.file), ...(mcpOff ? [mcpOff.claudeJson, mcpOff.storeFile] : [])];
+    for (const f of files) {
       let size = 0;
-      try { size = fs.statSync(c.file).size; } catch { size = 0; }
+      try { size = fs.statSync(f).size; } catch { size = 0; }
       if (size > maxBytes) return null;
     }
-    const loc = { mcpConfigs, installedPluginsFile: null, pluginCache: null, claudeSettingsFile: null };
-    return JSON.stringify(scanMcp(loc, null).map((e) => [e.id, e.source, e.path, e.description]));
+    const loc = { mcpConfigs, mcpOff, installedPluginsFile: null, pluginCache: null, claudeSettingsFile: null };
+    return JSON.stringify(scanMcp(loc, null).map((e) => [e.id, e.source, e.path, e.description, e.state]));
   } catch {
     return 'error';
   }

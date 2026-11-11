@@ -2,6 +2,7 @@
 // never saved, flagged as untrusted, and never allowed to shadow a global entry with the same name.
 import { resolveOptions as resolve } from '../core/options.mjs';
 import { readJsonObject } from '../core/files.mjs';
+import { isSafeMcpName } from '../core/mcp-store.mjs';
 import { loadConfig } from '../core/config.mjs';
 import { scanSkills } from '../scan/skills.mjs';
 import { scanMcp } from '../scan/mcp.mjs';
@@ -67,6 +68,35 @@ export function scanProject(opts = {}) {
   } catch {
     return [];
   }
+}
+
+/** A parked or 'off' global server that this project configures itself gives way to the project's entry. */
+export function dropShadowedOff(idx, projectEntries) {
+  const local = new Set(projectEntries.filter((e) => e.kind === 'mcp').map((e) => e.name));
+  if (!local.size) return idx;
+  return { ...idx, entries: idx.entries.filter((e) => !(e.kind === 'mcp' && (e.state === 'parked' || e.state === 'off') && local.has(e.name))) };
+}
+
+/**
+ * Servers this project switched off in Claude Code (`disabledMcpServers`, the list the /mcp toggle writes) show as
+ * 'disabled', with the command that switches them back on.
+ */
+export function markDisabledMcp(idx, opts = {}) {
+  let disabled;
+  try {
+    const r = resolve(opts);
+    const { claudeJson } = splitLocations(r);
+    const doc = claudeJson ? readJsonObject(claudeJson) : null;
+    const e = doc && doc.projects && typeof doc.projects === 'object' ? (doc.projects[r.cwd] || doc.projects[r.cwd.replace(/\\/g, '/')]) : null;
+    disabled = new Set(e && Array.isArray(e.disabledMcpServers) ? e.disabledMcpServers.filter((x) => typeof x === 'string') : []);
+  } catch { return idx; }
+  if (!disabled.size) return idx;
+  return {
+    ...idx,
+    entries: idx.entries.map((e) => (e.kind === 'mcp' && disabled.has(e.name) && e.state === 'installed'
+      ? { ...e, state: 'disabled', usage: isSafeMcpName(e.name) ? `qm mcp enable ${e.name} (switched off for this project; or switch it on in /mcp)` : 'switched off for this project: switch it on in /mcp' }
+      : e)),
+  };
 }
 
 // Global (personal) entries stay primary: an untrusted repo must not shadow them. A project

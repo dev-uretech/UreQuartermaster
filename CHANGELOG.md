@@ -2,6 +2,32 @@
 
 All notable changes to UreQuartermaster. Versions follow semantic versioning; each release is tagged `vX.Y.Z`.
 
+## 1.1.0
+
+MCP servers on demand for Claude Code. Claude Code starts every stdio MCP server in scope when a session starts, so
+servers configured at user scope run once per open session, in every project, whether they are used or not.
+
+- `qm mcp usage [--days N] [--json]`: which MCP servers each project really used, counted from the `tool_use` calls
+  in Claude Code's session transcripts (subagents included) of the last N days (default 14), with each server's
+  scopes (user, local, `.mcp.json`, plugin, parked, disabled) and transport (stdio = a local process; http/sse =
+  remote). Read-only; prints names, scopes, transports, project folders and counts, never a command, argument, URL,
+  `env` or header.
+- `qm mcp plan` and `qm mcp apply [--days N] [--min-projects N]`: move rarely used stdio servers from user scope to
+  the local scope of the projects that used them, and park the unused ones. Remote servers and servers used in at
+  least N projects (default 3) stay. `apply` takes a timestamped 0600 backup of `~/.claude.json` first.
+- Nothing is deleted: every definition taken off user scope is kept in `~/.urequartermaster/parked-mcp.json`
+  (mode 0600) and comes back with `qm mcp restore <name> [--project PATH | --user]`.
+- `qm mcp enable <name> [--project PATH]` and `qm mcp disable <name> [--project PATH]`: switch a server on or off for
+  one project. Disabling uses Claude Code's own per-project `disabledMcpServers` list (the one the `/mcp` toggle
+  writes); enabling a parked server adds a local-scope copy, which `disable` removes again. Changes take effect from
+  the next Claude Code session in that folder.
+- `qm search` and `qm list` show parked servers (`parked`), servers configured only in other projects (`off`) and
+  servers switched off for the current project (`disabled`), with the `qm mcp enable` command. The skill tells the
+  agent to enable a needed server for the current project, say that it works from the next session, and suggest
+  disabling it at the end.
+- Writes to `~/.claude.json` are atomic (0600 temporary file and rename), serialised between qm processes, refused
+  when the MCP part of the file changed since it was read, and retried when Claude Code saved the file in between.
+
 ## 1.0.2
 
 - `qm remove <collection>` removes a git collection added with `qm add` from the library and rebuilds the index.

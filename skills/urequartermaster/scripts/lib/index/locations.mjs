@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { agentLocations } from '../core/paths.mjs';
+import { storePath } from '../core/mcp-store.mjs';
 
 function canon(platform, file) {
   const p = platform === 'win32' ? path.win32 : path.posix;
@@ -33,6 +34,8 @@ export function splitLocations(r) {
     ...loc,
     skillDirs: loc.skillDirs.filter((s) => !isProjectSkill(s)),
     mcpConfigs: loc.mcpConfigs.filter((m) => !isProjectMcp(m)),
+    // Parked and other-project Claude Code servers, indexed as 'parked' / 'off' (enable with qm mcp enable).
+    mcpOff: r.dataDir ? { claudeJson: loc.claudeJson, storeFile: storePath(r.dataDir) } : null,
   };
   const project = {
     skillDirs: loc.skillDirs.filter(isProjectSkill),

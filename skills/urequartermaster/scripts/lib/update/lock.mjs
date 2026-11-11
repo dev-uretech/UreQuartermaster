@@ -1,4 +1,5 @@
-// The update lock (<dataDir>/update.lock): one update or rollback at a time. Taking over a stale lock
+// The update lock (<dataDir>/update.lock): one update or rollback at a time. The same code guards
+// <dataDir>/mcp.lock, so two qm processes never edit the MCP configuration together. Taking over a stale lock
 // is race-free: only one process can win the rename of the old file.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -14,13 +15,13 @@ const FUTURE_SLACK_MS = 60 * 1000;
  * between), it is put back without overwriting and we give up.
  * `opts.stat` exists so tests can interleave two takeovers.
  */
-export function acquireLock(dir, { stat = fs.statSync } = {}) {
+export function acquireLock(dir, { stat = fs.statSync, name = 'update.lock', what = 'update' } = {}) {
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, 'update.lock');
+  const file = path.join(dir, name);
   const token = `${process.pid}-${crypto.randomBytes(8).toString('hex')}`;
   // A fresh file's mtime can be a few ms ahead of Date.now(); "future" means over a minute ahead.
   const isStale = (st) => { const age = Date.now() - st.mtimeMs; return age < -FUTURE_SLACK_MS || age > LOCK_STALE_MS; };
-  const busy = () => new Error('Another update is in progress');
+  const busy = () => new Error(`Another ${what} is in progress`);
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       fs.writeFileSync(file, token, { flag: 'wx' });

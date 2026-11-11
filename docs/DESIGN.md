@@ -39,7 +39,8 @@ the agent search it before each non-trivial request. It succeeds when the user n
   comes from the agent's own model; the index only does fast text search.
 - Not a replacement for the host's own tool search (for example Claude Code's search for deferred MCP tools): it
   points the agent at the right server and lets the host find the tool.
-- No change to an agent's configuration without an explicit command from the user.
+- No change to an agent's configuration without an explicit command from the user. The one exception: the skill
+  lets the agent switch on a parked MCP server for the current project when a task needs it, and it must say so.
 
 ## Failure even if it "works"
 
@@ -73,6 +74,17 @@ semantics by writing the queries, including English ones for non-English request
 start; reading those would break the rule that no secret is ever read. The index records the server (name, type,
 command) with a description built from an allowlist; the agent's host already knows the tool names. The user can
 write a better description in `config.json`.
+
+**MCP servers on demand, not all at once.** Claude Code starts every stdio server in scope at the start of each
+session, so a server at user scope costs a process (often a Node runtime) in every open session of every project.
+The usage that matters is already on disk: the session transcripts record each MCP tool call with its project. So
+`qm mcp` measures before it moves, moves servers to the projects that use them instead of deleting anything, and
+keeps every removed definition in a private store. Switching a server off reuses Claude Code's own per-project list
+(`disabledMcpServers`, written by `/mcp`) rather than a new mechanism. It edits `~/.claude.json` directly instead of
+calling `claude mcp add-json`, which would expose a server's credentials on a command line; because Claude Code
+rewrites that file constantly, every write re-reads it, refuses when the MCP part moved under it, and replaces it
+atomically with mode 0600. Changes apply from the next session: that is how Claude Code loads servers, and the
+documentation is honest about it.
 
 **A reminder, not a classifier, to make it trigger.** The skill's own description is subject to the same budget
 cut, so it is short and starts with when to use it. In Claude Code the plugin adds a light `UserPromptSubmit` hook:
