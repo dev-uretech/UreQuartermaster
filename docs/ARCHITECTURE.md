@@ -20,6 +20,7 @@ skills/urequartermaster/      the skill that gets installed (the only shipped fo
     library/                  add, sync, park, unpark
     update/                   signed self-update and rollback
     agent/                    what touches the agents: init block, prompt hook, doctor
+    mcp/                      Claude Code MCP servers on demand: usage, plan, apply, enable, disable, restore
     version.mjs, pubkey.mjs   release contract: bundles and release tools read them at these paths
 .claude-plugin/               Claude Code plugin and marketplace manifests
 hooks/hooks.json              Claude Code UserPromptSubmit hook: runs `qm hook`
@@ -32,7 +33,7 @@ docs/                         this file and DESIGN.md
 ## Module map
 
 All under `skills/urequartermaster/scripts/lib/`. Imports point one way: `commands/` and `cli.mjs` use everything;
-`library/`, `update/` and `agent/` use `index/`, `scan/` and `core/`; `index/` uses `scan/` and `core/`; `scan/` uses
+`library/`, `update/`, `agent/` and `mcp/` use `index/`, `scan/` and `core/` (`mcp/` also uses `update/lock.mjs`); `index/` uses `scan/` and `core/`; `scan/` uses
 `core/`; `core/` uses nothing else. Each module starts with a short comment saying what it does and what it must
 never do.
 
@@ -42,12 +43,14 @@ never do.
 | `commands/common.mjs` | Argument parsing, `UsageError`, third-party notices, error cleaning |
 | `commands/search.mjs`, `load.mjs`, `list.mjs` | `qm search`, `qm load`, `qm list` and `qm index` |
 | `commands/library.mjs` | `qm add`, `sync`, `remove`, `park`, `unpark` |
+| `commands/mcp.mjs` | `qm mcp usage`, `plan`, `apply`, `enable`, `disable`, `restore`: printing names, scopes and counts only |
 | `commands/init.mjs`, `doctor.mjs`, `update.mjs` | `qm init`, `qm doctor`, `qm update` and `qm rollback` |
 | `core/paths.mjs` | Data folder and every agent's file locations, per platform; which skill folders each agent reads |
 | `core/config.mjs` | `config.json` and `state.json`: tolerant load, atomic save |
 | `core/text.mjs` | `clean()` / `cleanBody()`: strip control characters from third-party text |
 | `core/files.mjs` | Never-throwing file reads, `readJsonObject`, atomic `writeFileAtomic` |
 | `core/options.mjs` | The environment of a command (home, platform, env, cwd, data folder, clock), overridable in tests |
+| `core/mcp-store.mjs` | The parked MCP store (`parked-mcp.json`, 0600), its safe server names, private atomic writes |
 | `core/which.mjs` | PATH resolution of executables, without running them or using a shell |
 | `version.mjs` | The version, set only here (read by the release tools and inside bundles) |
 | `pubkey.mjs` | The Ed25519 public key releases must be signed with |
@@ -85,6 +88,9 @@ never do.
 | `update/lock.mjs` | The exclusive update lock, with race-free takeover of a stale one |
 | `agent/init.mjs` | The marked block in the agents' instruction files |
 | `agent/hook.mjs` | The `UserPromptSubmit` hook |
+| `mcp/usage.mjs` | MCP tool calls per server and project, from Claude Code's transcripts (matching lines only are decoded) |
+| `mcp/claude-config.mjs` | Scopes of `~/.claude.json`, hash of its MCP part, 0600 backups, the locked, re-checked atomic write |
+| `mcp/manage.mjs` | Inventory, plan, apply, enable, disable and restore |
 | `agent/doctor.mjs` | Read-only diagnosis: index, hook, duplicates, Claude Code listing size, copies per agent |
 
 ## Data flow
@@ -118,6 +124,17 @@ moves an installed skill into `library/_parked/` and records where it came from,
 entry; `qm unpark` reverses it, and both resume safely after a crash. `qm park --plugin` builds (and, with
 `--yes`, runs) `claude plugin disable`.
 
+**MCP on demand.** `qm mcp usage` maps each `mcp__<server>__<tool>` call in the transcripts to a configured server
+(Claude Code's tool-name form of the server name; `plugin_<plugin>_<server>` for plugin servers) and to the session's
+working folder; subagent transcripts take their session's folder. `qm mcp plan` turns that into keep / move / park for
+the user-scope servers; `apply` saves the definitions to the parked store first, then commits `~/.claude.json`:
+under `mcp.lock`, after a backup, re-reading the file and refusing if `mcpHash` (user servers, every project's servers
+and disabled list) changed since the plan, and retrying when the file's size or mtime changed between that read and
+the rename. `enable` and `disable` change one project: its `disabledMcpServers` (Claude Code's own toggle list) or a
+local-scope copy from the store. `scanMcp` indexes the store's servers as `parked` and other projects' local servers
+as `off`; `ensureIndex` drops those when the current project has the server itself and marks the project's disabled
+servers `disabled`.
+
 **Doctor.** `skillReaders()` in `core/paths.mjs` says which skill folders each agent reads: Claude Code its own
 folder, the project's `.claude/skills` and its enabled plugins (not `~/.agents/skills`, which the skills CLI links
 into `~/.claude/skills` when Claude Code is a target); Codex `~/.agents/skills`, `CODEX_HOME/skills` and the
@@ -140,12 +157,15 @@ Data folder: `UREQM_HOME` when it is an absolute path, else `~/.urequartermaster
 
 | Path | Content |
 |---|---|
-| `index.json` | `{ version: 2, builtAt, fingerprint, entries[] }`. Each entry: `id` (`<kind>:<name>`, `@<source>` and `#n` suffixes for duplicates), `kind` (`skill`, `mcp`, `plugin`, `cli`), `name`, `description`, `headings`, `path`, `source`, `state` (`installed`, `library`, `plugin-disabled`, `available`), `usage`, optional `duplicateOf` and `trustRoot`. Another `version` is ignored and rebuilt. |
+| `index.json` | `{ version: 2, builtAt, fingerprint, entries[] }`. Each entry: `id` (`<kind>:<name>`, `@<source>` and `#n` suffixes for duplicates), `kind` (`skill`, `mcp`, `plugin`, `cli`), `name`, `description`, `headings`, `path`, `source`, `state` (`installed`, `library`, `plugin-disabled`, `available`, and for MCP servers `parked`, `off`, `disabled`), `usage`, optional `duplicateOf` and `trustRoot`. Another `version` is ignored and rebuilt. |
 | `config.json` | User settings: `extraSkillDirs`, `clis`, `autoUpdate`, `hook`, `maxIndexAgeHours`, `mcpDescriptions`, `trustProjectMcp`. Missing, corrupt or wrong-typed fields fall back to defaults. |
 | `state.json` | Bookkeeping: `lastUpdateCheck`, `installedVersion`, `lastUpdateMessage`, `parked[]` (`name`, `from`, `to`, `links`, `lockKey`/`lockIndex`/`lockEntry`, and `pending` or `interrupted` while a move is unfinished). |
 | `library/<collection>/` | A git collection added with `qm add`. `.tmp-*` folders are interrupted clones or removals, removed after an hour. |
 | `library/_parked/<skill>/` | A parked skill. |
 | `backup/<version>-<timestamp>[-n]/` | Previous versions kept by updates and rollbacks (three at most). |
+| `parked-mcp.json` | Mode 0600. `{ version: 1, servers: { <name>: { definition, from: 'user'\|'local', fromProject?, parkedAt } }, enabled: { <name>: [project folders] } }`: whole definitions qm took off Claude Code's configuration, and where `qm mcp enable` added a copy. Never printed. |
+| `backups/claude.json-<timestamp>.bak` | Mode 0600 (folder 0700): `~/.claude.json` as it was before each `qm mcp` write; the newest 20 are kept. |
+| `mcp.lock` | Exclusive lock of a `qm mcp` write (same rules as `update.lock`). |
 | `update.lock` | Exclusive lock of an update or rollback (`wx` create; taken over when older than 10 minutes). |
 
 JSON files are written atomically (temporary file, then rename). The skills CLI's `~/.agents/.skill-lock.json` is

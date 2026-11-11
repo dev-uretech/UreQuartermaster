@@ -13,7 +13,7 @@ import { scanPlugins } from '../scan/plugins.mjs';
 import { scanCli } from '../scan/cli-tools.mjs';
 import { splitLocations } from './locations.mjs';
 import { computeFingerprint, sameFingerprint } from './fingerprint.mjs';
-import { scanProject, withProject } from './project.mjs';
+import { scanProject, withProject, dropShadowedOff, markDisabledMcp } from './project.mjs';
 
 /** @typedef {{
  *  id: string,            // "<kind>:<name>" or "<kind>:<plugin>:<name>" on conflict
@@ -21,7 +21,7 @@ import { scanProject, withProject } from './project.mjs';
  *  name: string, description: string, headings: string[],
  *  path: string|null,     // SKILL.md, config file or executable
  *  source: string,        // e.g. 'claude', 'agents', 'codex', 'plugin:<name>', 'library:<collection>', 'project'
- *  state: 'installed'|'library'|'plugin-disabled'|'available',
+ *  state: 'installed'|'library'|'plugin-disabled'|'available'|'parked'|'off'|'disabled',
  *  usage: string,         // how to use it: "Skill tool: <name>", "qm load <name>", "MCP server <name>", "<command> --help"
  *  duplicateOf?: string   // id of the entry this one shadows; kept in the index for doctor, skipped by search
  * }} Entry */
@@ -82,7 +82,7 @@ export function ensureIndex(opts = {}, { allowRebuild = true } = {}) {
     try { saveIndex(r.dataDir, idx); } catch { /* read-only data dir: still serve it */ }
   }
   const project = scanProject(r);
-  if (idx) return withProject(idx, project);
+  if (idx) return markDisabledMcp(withProject(dropShadowedOff(idx, project), project), r);
   if (!project.length) return null;
   return { version: INDEX_VERSION, builtAt: null, fingerprint: null, entries: project };
 }

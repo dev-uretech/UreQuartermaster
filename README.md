@@ -114,7 +114,7 @@ the host: whole collections added with `qm add`, and skills you park. Library sk
 |---|---|
 | `qm search <query>... [--limit N] [--kind skill\|mcp\|plugin\|cli] [--json]` | Search the index with one or more queries; shows each hit's full description and how to use it |
 | `qm load <name\|id>` | Print a skill's `SKILL.md` and base folder (any skill, including library and disabled-plugin skills) |
-| `qm list [--kind …] [--state installed\|library\|plugin-disabled\|available] [--all]` | List what is indexed (`--all` includes duplicates) |
+| `qm list [--kind …] [--state installed\|library\|plugin-disabled\|available\|parked\|off\|disabled] [--all]` | List what is indexed (`--all` includes duplicates) |
 | `qm index [--json]` | Rebuild the index now |
 | `qm add <url> [--name <collection>]` | Clone a git collection of skills into the library (any git host) |
 | `qm sync` | Pull every library collection and rebuild the index |
@@ -122,12 +122,57 @@ the host: whole collections added with `qm add`, and skills you park. Library sk
 | `qm park <skill>` | Move an installed skill from a user folder into the library |
 | `qm park --plugin <plugin> [--yes]` | Disable a Claude Code plugin; its skills stay searchable and loadable |
 | `qm unpark <skill> [--forget]` | Put a parked skill back; `--forget` drops the record of a park that cannot be undone |
+| `qm mcp usage [--days N] [--json]` | Which Claude Code MCP servers each project really used, with their scopes and transports (read-only) |
+| `qm mcp plan [--days N] [--min-projects N] [--json]` | Propose moving rarely used local MCP servers from user scope to the projects that use them |
+| `qm mcp apply [--days N] [--min-projects N]` | Carry out that plan, after a backup of `~/.claude.json` |
+| `qm mcp enable <server> [--project PATH]` | Switch a server on for one project (from the next session) |
+| `qm mcp disable <server> [--project PATH]` | Switch it off again for that project |
+| `qm mcp restore <server> [--project PATH \| --user]` | Put a parked server definition back in Claude Code's configuration |
 | `qm init [--remove] [--dry-run] [--agent claude\|codex\|gemini\|copilot\|opencode]` | Add or remove the "search first" block in the agents' instruction files |
 | `qm doctor` | Check duplicates, the estimated size of Claude Code's skill listing, one UreQuartermaster copy per agent, Node and the hook |
 | `qm update [--check]` | Check for and install a signed release now |
 | `qm rollback` | Go back to the version before the last update |
 | `qm hook` | Used by the Claude Code hook (reads the prompt as JSON on stdin) |
 | `qm --version`, `qm help` | Version and usage |
+
+## MCP servers on demand (Claude Code)
+
+Claude Code starts every stdio MCP server in scope when a session starts. A server configured at **user scope**
+therefore runs as a local process in every session of every project, used or not: with twenty such servers and a
+dozen open sessions, that is a few hundred processes and many gigabytes of memory. `qm mcp` keeps only the servers
+that a project actually uses running there.
+
+```bash
+qm mcp usage                 # what each project really used in the last 14 days, scope and transport per server
+qm mcp plan                  # what would move: nothing is changed
+qm mcp apply                 # do it (backup of ~/.claude.json first)
+qm mcp enable <server>       # need a server here? switch it on for this project, from the next session
+qm mcp disable <server>      # and off again
+qm mcp restore <server>      # put a parked definition back where it came from (or --user / --project PATH)
+```
+
+- **Usage** is counted from the MCP tool calls recorded in Claude Code's session transcripts
+  (`~/.claude/projects/`, subagents included), per project folder. Only tool names, dates and folders are read.
+- **The plan** keeps remote servers (http/sse: no local process) and stdio servers used in at least
+  `--min-projects` projects (default 3). A stdio server used in fewer projects is copied into the local scope of
+  each of them and removed from user scope; one not used at all is parked.
+- **Nothing is deleted.** Every definition taken off user scope is kept whole in
+  `~/.urequartermaster/parked-mcp.json` (mode 0600, as it can hold credentials) until you restore it.
+- **Enable and disable** work per project. `disable` adds the server to the project's `disabledMcpServers` in
+  `~/.claude.json`, the list Claude Code's own `/mcp` toggle writes, so the definition stays untouched; a copy that
+  `enable` added from the parked store is removed instead. `enable` undoes either.
+- **When it takes effect.** Claude Code reads MCP servers when a session starts: a change applies to the next
+  session in that folder. In a running session you can switch a server that is already configured on or off at
+  once with `/mcp`; a server that was not configured when the session started needs a new session.
+- `qm search` lists servers that do not run here as `parked`, `off` (configured only in other projects) or
+  `disabled`, with the command that enables them, so the agent can turn one on when a task needs it.
+- **Safe writes.** `~/.claude.json` is written through a 0600 temporary file and a rename, after a timestamped
+  0600 backup in `~/.urequartermaster/backups/` (the newest 20 are kept). The file is read again right before
+  writing: if the MCP part changed since it was read (another session or command), nothing is written; if only
+  other keys changed (Claude Code saves the file often), the change is applied to the fresh copy.
+- `qm mcp` edits the JSON itself instead of calling `claude mcp add-json` / `claude mcp remove`: those would put a
+  server's `env` (often its credentials) on a command line, visible to other processes, and `remove` drops the
+  definition. Only Claude Code's configuration is managed; other agents' MCP files are not changed.
 
 ## Configuration
 
@@ -179,9 +224,12 @@ optional; a missing or broken file means defaults. Set `UREQM_HOME` to an absolu
   checked) and let it update itself with signed releases.
 - **No telemetry.** The network is used only by `qm add`, `qm sync` and the update check (one fixed URL,
   `https://api.github.com/repos/dev-uretech/UreQuartermaster/releases/latest`).
-- **Never read:** the `env`, `headers` and authentication fields of MCP configurations. Secrets inside a server's
+- **Never read by the index:** the `env`, `headers` and authentication fields of MCP configurations. Secrets inside a server's
   arguments (`--token=…`, `--api-key …`, `?key=` in URLs) are redacted. Nothing secret is stored in the index or
   printed.
+- **`qm mcp` moves definitions whole.** To move or park a Claude Code server it copies the server's complete
+  definition (including `env` and `headers`) between `~/.claude.json` and the parked store, both mode 0600. It never
+  prints, logs or indexes any of it: the output shows server names, scopes, transports, folders and counts only.
 - **MCP descriptions** are built from an allowlist (command name, package or image name, script name, URL host);
   a flag's value is never used. The server **name you chose** in your configuration is shown as it is.
 - **Third-party text is data.** Search results and loaded skills are marked as third-party content, and the skill
@@ -189,7 +237,9 @@ optional; a missing or broken file means defaults. Set `UREQM_HOME` to an absolu
 - **Project entries** (skills in the current repository's `.claude/skills` and `.agents/skills`, and its MCP
   servers) are flagged as untrusted. Project MCP servers count only once approved in Claude Code (Cursor's only
   with `trustProjectMcp`). Project and library skills are loaded only if their files stay inside their own folder.
-- **No silent changes.** Agent configurations are changed only by `qm init` and `qm park --plugin`, which you run.
+- **No silent changes.** Agent configurations are changed only by `qm init`, `qm park --plugin` and the `qm mcp`
+  commands that change something (`apply`, `enable`, `disable`, `restore`), which you run; the skill lets the agent
+  run `qm mcp enable` for the current project when a task needs a server, and tell you.
   `qm park` and `qm unpark` also move skill folders out of and back into your agents' skill folders, and update the
   skills CLI's `~/.agents/.skill-lock.json` for the skills they move. Node.js is never installed without your
   consent.
@@ -204,6 +254,8 @@ optional; a missing or broken file means defaults. Set `UREQM_HOME` to an absolu
 - Skills that are symbolic links inside a project or the library are ignored.
 - If an update is killed between its two renames, the previous version is in `~/.urequartermaster/backup/`:
   copy it back to the skill folder.
+- `qm mcp usage` reads every transcript changed in the period (several GB for heavy users take some seconds).
+  Sessions started in a subfolder count as their own project, as they do for Claude Code.
 - In v1 MCP servers are not started to read their tool lists (most need credentials to start). The index points
   to the server; the agent's own tool search finds the tool.
 

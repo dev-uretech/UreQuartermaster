@@ -55,7 +55,7 @@ test('fingerprint ignores rewrites of .claude.json and settings.json that leave 
   const f0 = computeFingerprint(s.opts);
   // What Claude Code does on almost every tool call: other keys change, the file is saved again.
   write(claudeJson, { numStartups: 7, tipsHistory: { x: 3 }, mcpServers: { srv: { command: 'node', args: ['x.js'] } },
-    projects: { [s.cwd]: { lastCost: 1, mcpServers: { local: { command: 'npx', args: ['p'] } } } } });
+    projects: { [s.cwd]: { lastCost: 1, disabledMcpjsonServers: [] } } });
   touch(claudeJson, 300);
   write(settings, { enabledPlugins: { 'a@m': true }, theme: 'light' });
   touch(settings, 300);
@@ -64,7 +64,12 @@ test('fingerprint ignores rewrites of .claude.json and settings.json that leave 
   write(claudeJson, { mcpServers: { srv: { command: 'node', args: ['x.js'], env: { TOKEN: 'other' } } } });
   assert.equal(computeFingerprint(s.opts), f0);
   write(settings, { enabledPlugins: { 'a@m': false } });
-  assert.notEqual(computeFingerprint(s.opts), f0);
+  const f1 = computeFingerprint(s.opts);
+  assert.notEqual(f1, f0);
+  // A server in a project's local scope is indexed (as 'off' elsewhere), whatever the current folder is.
+  write(claudeJson, { mcpServers: { srv: { command: 'node', args: ['x.js'] } },
+    projects: { '/some/other/project': { mcpServers: { local: { command: 'npx', args: ['p'] } } } } });
+  assert.notEqual(computeFingerprint(s.opts), f1);
 });
 
 test('fingerprint changes when a skill folder is added, or config.json / library appear', () => {
